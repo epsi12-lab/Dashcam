@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config.dart';
+import 'live_page.dart';
 import 'verification_page.dart';
 
 class HomePage extends StatelessWidget {
@@ -30,7 +31,7 @@ class HomePage extends StatelessWidget {
         ),
         body: const TabBarView(children: [
           VerificationPage(),
-          Center(child: Text('Suivi en direct : étape suivante')),
+          LivePage(),
         ]),
       ),
     );
