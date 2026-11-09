@@ -1,0 +1,20 @@
+name: demo_segments
+description: A sample command-line application.
+publish_to: none
+version: 1.0.0
+# repository: https://github.com/my_org/my_repo
+
+environment:
+  sdk: ^3.10.8
+
+# Add regular dependencies here.
+dependencies:
+  dashcam_core:
+    path: ../../packages/dashcam_core
+  path: ^1.9.0
+  supabase: ^2.16.5
+  uuid: ^4.6.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6
