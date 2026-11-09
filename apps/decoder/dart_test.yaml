@@ -1,0 +1,3 @@
+tags:
+  # Tests qui nécessitent Supabase local (sb start).
+  integration:
