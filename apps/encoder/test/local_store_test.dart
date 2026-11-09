@@ -74,7 +74,7 @@ void main() {
 
     // On provoque un conflit : une ligne occupe déjà le numéro 2 dans `segments`.
     await db.insert('segments',
-        {'seq': 2, 'file_name': 'x', 'started_at': '', 'ended_at': ''});
+        {'seq': 2, 'file_name': 'x', 'started_at_ms': 0, 'ended_at_ms': 0});
 
     await expectLater(store.recordSegment(second()), throwsA(anything));
 

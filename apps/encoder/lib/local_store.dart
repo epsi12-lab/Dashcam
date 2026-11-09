@@ -22,13 +22,18 @@ class LocalStore {
         seq integer primary key,
         payload text not null
       )''');
-    await db.execute('''
+        await db.execute('''
       create table if not exists segments (
         seq integer primary key,
         file_name text not null,
-        started_at text not null,
-        ended_at text not null,
-        protected integer not null default 0
+        started_at_ms integer not null,
+        ended_at_ms integer not null
+      )''');
+    await db.execute('''
+      create table if not exists protected_windows (
+        id integer primary key autoincrement,
+        starts_at_ms integer not null,
+        ends_at_ms integer not null
       )''');
     return LocalStore._(db);
   }
@@ -53,11 +58,11 @@ class LocalStore {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
       await txn.insert('upload_queue', {'seq': fp.seq, 'payload': payload});
-      await txn.insert('segments', {
+            await txn.insert('segments', {
         'seq': fp.seq,
         'file_name': SegmentName(deviceId: fp.deviceId, seq: fp.seq).fileName,
-        'started_at': json['started_at'],
-        'ended_at': json['ended_at'],
+        'started_at_ms': fp.startedAt.millisecondsSinceEpoch,
+        'ended_at_ms': fp.endedAt.millisecondsSinceEpoch,
       });
     });
   }
@@ -81,6 +86,36 @@ class LocalStore {
   Future<List<String>> segmentFileNames() async {
     final rows = await _db.query('segments', columns: ['file_name'], orderBy: 'seq');
     return [for (final row in rows) row['file_name']! as String];
+  }
+
+    /// Enregistre une fenêtre de temps dont les segments ne seront jamais purgés.
+  Future<void> addProtectedWindow(DateTime start, DateTime end) async {
+    await _db.insert('protected_windows', {
+      'starts_at_ms': start.millisecondsSinceEpoch,
+      'ends_at_ms': end.millisecondsSinceEpoch,
+    });
+  }
+
+  /// Segments terminés avant [cutoff] et ne chevauchant aucune fenêtre protégée.
+  Future<List<({int seq, String fileName})>> expiredSegments(DateTime cutoff) async {
+    final rows = await _db.rawQuery('''
+      select seq, file_name from segments s
+      where s.ended_at_ms < ?
+        and not exists (
+          select 1 from protected_windows w
+          where w.starts_at_ms < s.ended_at_ms
+            and w.ends_at_ms > s.started_at_ms
+        )
+      order by seq''', [cutoff.millisecondsSinceEpoch]);
+    return [
+      for (final row in rows)
+        (seq: row['seq']! as int, fileName: row['file_name']! as String),
+    ];
+  }
+
+  /// Retire un segment de la liste, une fois son fichier supprimé.
+  Future<void> removeSegment(int seq) async {
+    await _db.delete('segments', where: 'seq = ?', whereArgs: [seq]);
   }
 
   static Fingerprint _decode(String payload) =>
