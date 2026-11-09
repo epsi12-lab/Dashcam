@@ -1,0 +1,4 @@
+tags:
+  # Tests qui nécessitent Supabase local (supabase start).
+  integration:
+    
