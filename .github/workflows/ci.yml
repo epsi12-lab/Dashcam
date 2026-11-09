@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Moindre privilège : le workflow ne fait que lire le dépôt.
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: Module commun (Dart)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/dashcam_core
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.10.8
+
+      - name: Installer les dépendances
+        run: dart pub get
+
+      - name: Analyse statique
+        run: dart analyze --fatal-infos
+
+      - name: Tests unitaires
+        run: dart test
+
+  database:
+    name: Base de données (pgTAP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v2
+        with:
+          version: 3.0.0
+          github-token: ${{ github.token }}
+
+      - name: Démarrer la base et appliquer les migrations
+        run: supabase db start
+
+      - name: Tests de la base
+        run: supabase test db
