@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config.dart';
+import 'verification_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -28,7 +29,7 @@ class HomePage extends StatelessWidget {
           ]),
         ),
         body: const TabBarView(children: [
-          Center(child: Text('Écran de vérification : prochaine étape')),
+          VerificationPage(),
           Center(child: Text('Suivi en direct : étape suivante')),
         ]),
       ),
