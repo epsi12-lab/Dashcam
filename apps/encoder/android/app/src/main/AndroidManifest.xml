@@ -1,4 +1,11 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Le plugin camera déclare le micro : on le retire, aucun son n'est enregistré. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
+    
     <application
         android:label="dashcam_encoder"
         android:name="${applicationName}"
