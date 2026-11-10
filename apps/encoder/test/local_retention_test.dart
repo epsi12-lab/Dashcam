@@ -27,10 +27,12 @@ class Env {
         ),
       ));
 
-  LocalRetention retention() => LocalRetention(
+  LocalRetention retention({int? maxBytes}) => LocalRetention(
         store: store,
         deleteFile: (name) async => deleted.add(name),
         now: () => current,
+        maxBytes: maxBytes,
+        sizeOf: (name) async => 100,
       );
 
   /// Enregistre les segments suivants : le n-ième couvre [t0 + (n-1)·D, t0 + n·D].
@@ -131,6 +133,54 @@ void main() {
 
       // Les segments 1 à 4 chevauchent la fenêtre ; 5 [40 s, 50 s] et 6 [50 s, 60 s] non.
       expect(env.deleted, [fileOf(5), fileOf(6)]);
+    });
+  });
+
+  group('EF-E07 : quota d\'espace', () {
+    test('sous le quota, rien n\'est supprimé', () async {
+      final env = await Env.create();
+      await env.recordSegments(3); // 300 octets
+      env.current = t0.add(const Duration(hours: 1));
+
+      expect(await env.retention(maxBytes: 500).run(), 0);
+      expect(env.deleted, isEmpty);
+    });
+
+    test('au-delà du quota, les plus anciens partent jusqu\'à repasser dessous',
+        () async {
+      final env = await Env.create();
+      await env.recordSegments(5); // 500 octets
+      env.current = t0.add(const Duration(hours: 1));
+
+      await env.retention(maxBytes: 350).run();
+
+      expect(env.deleted, [fileOf(1), fileOf(2)]); // il reste 300 octets
+    });
+
+    test('un segment protégé n\'est jamais supprimé pour faire de la place',
+        () async {
+      final env = await Env.create();
+      await env.recordSegments(10); // 1000 octets, de t0 à t0 + 100 s
+      // Incident à t0 + 25 s : fenêtre [t0 − 35 s, t0 + 55 s], segments 1 à 6.
+      await env.retention().protectIncident(t0.add(const Duration(seconds: 25)));
+      env.current = t0.add(const Duration(hours: 1));
+
+      await env.retention(maxBytes: 350).run();
+
+      // Seuls 7 à 10 sont supprimables : il reste 600 octets, au-dessus du
+      // quota, mais les segments protégés sont conservés.
+      expect(env.deleted, [fileOf(7), fileOf(8), fileOf(9), fileOf(10)]);
+    });
+
+    test('la durée et le quota s\'appliquent l\'un après l\'autre', () async {
+      final env = await Env.create();
+      await env.recordSegments(5);
+      // Les segments 1 et 2 ont plus de 24 h ; les 3 restants font 300 octets.
+      env.current = t0.add(const Duration(hours: 24, seconds: 25));
+
+      await env.retention(maxBytes: 250).run();
+
+      expect(env.deleted, [fileOf(1), fileOf(2), fileOf(3)]);
     });
   });
 }

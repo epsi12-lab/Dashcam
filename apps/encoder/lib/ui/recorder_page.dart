@@ -92,8 +92,13 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
           final file = File(p.join(segmentsDir.path, name));
           if (await file.exists()) await file.delete();
         },
+        sizeOf: (name) async {
+          final file = File(p.join(segmentsDir.path, name));
+          return await file.exists() ? await file.length() : 0;
+        },
         now: () => DateTime.now().toUtc(),
         retention: AppConfig.isDemo ? const Duration(minutes: 2) : const Duration(hours: 24),
+        maxBytes: 2 * 1024 * 1024 * 1024, // 2 Go, soit environ 45 min en 720p
       );
 
       final cameras = await availableCameras();
@@ -112,7 +117,13 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
     if (description == null || _opening) return;
     _opening = true;
     try {
-      final camera = CameraController(description, ResolutionPreset.high, enableAudio: false);
+      final camera = CameraController(
+        description,
+        // 720p, pour la qualité de la preuve. Le débit (12 Mbit/s) est imposé
+        // par le profil du constructeur : ce téléphone ignore videoBitrate.
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
       await camera.initialize();
       await camera.lockCaptureOrientation(DeviceOrientation.landscapeLeft);
       if (!mounted) {

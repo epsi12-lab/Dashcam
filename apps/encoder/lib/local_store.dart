@@ -97,16 +97,29 @@ class LocalStore {
   }
 
   /// Segments terminés avant [cutoff] et ne chevauchant aucune fenêtre protégée.
-  Future<List<({int seq, String fileName})>> expiredSegments(DateTime cutoff) async {
+  Future<List<({int seq, String fileName})>> expiredSegments(DateTime cutoff) =>
+      _unprotectedSegments(endedBefore: cutoff);
+
+  /// Tous les segments ne chevauchant aucune fenêtre protégée, du plus ancien
+  /// au plus récent.
+  Future<List<({int seq, String fileName})>> unprotectedSegments() =>
+      _unprotectedSegments();
+
+  Future<List<({int seq, String fileName})>> _unprotectedSegments({
+    DateTime? endedBefore,
+  }) async {
     final rows = await _db.rawQuery('''
       select seq, file_name from segments s
-      where s.ended_at_ms < ?
+      where (? is null or s.ended_at_ms < ?)
         and not exists (
           select 1 from protected_windows w
           where w.starts_at_ms < s.ended_at_ms
             and w.ends_at_ms > s.started_at_ms
         )
-      order by seq''', [cutoff.millisecondsSinceEpoch]);
+      order by seq''', [
+      endedBefore?.millisecondsSinceEpoch,
+      endedBefore?.millisecondsSinceEpoch,
+    ]);
     return [
       for (final row in rows)
         (seq: row['seq']! as int, fileName: row['file_name']! as String),
