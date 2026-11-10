@@ -1,4 +1,4 @@
 essai*.sql
-tools/demo_segments/demo_videos/
-tools/demo_segments/demo_late/
 apps/*/env/*.json
+tools/demo_segments/demo_*/
+supabase/snippets/
