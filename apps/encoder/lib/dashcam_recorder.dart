@@ -83,17 +83,24 @@ class DashcamRecorder {
   DateTime? _segmentStart;
   DateTime? _previousEnd;
 
+  /// Au-delà, on considère que la caméra ne répond plus.
+  static const _cameraTimeout = Duration(seconds: 5);
+
   /// Traitements en cours, enchaînés : un segment à la fois, dans l'ordre.
   Future<void> _pending = Future.value();
 
   Future<void> start() async {
     if (_running) return;
     _running = true;
-    state.value = state.value.copyWith(recording: true, clearError: true);
+    state.value = state.value.copyWith(clearError: true);
     try {
       await _startSegment();
+      // « Enregistrement » seulement une fois le démarrage confirmé.
+      state.value = state.value.copyWith(recording: true);
     } on CameraException catch (e) {
       _fail('Démarrage impossible : ${e.description}');
+    } on TimeoutException {
+      _fail('La caméra ne répond pas au démarrage. Relancez l\'application.');
     }
   }
 
@@ -106,6 +113,8 @@ class DashcamRecorder {
       if (camera.value.isRecordingVideo) await _closeSegment();
     } on CameraException catch (e) {
       state.value = state.value.copyWith(error: 'Arrêt incomplet : ${e.description}');
+    } on TimeoutException {
+      state.value = state.value.copyWith(error: 'Arrêt incomplet : la caméra ne répond pas.');
     }
     await _pending;
     state.value = state.value.copyWith(recording: false);
@@ -117,7 +126,7 @@ class DashcamRecorder {
   }
 
   Future<void> _startSegment() async {
-    await camera.startVideoRecording();
+    await camera.startVideoRecording().timeout(_cameraTimeout);
     final start = DateTime.now().toUtc();
     final previousEnd = _previousEnd;
     if (previousEnd != null) {
@@ -134,11 +143,13 @@ class DashcamRecorder {
       if (_running) await _startSegment();
     } on CameraException catch (e) {
       _fail('Erreur de la caméra : ${e.description}');
+    } on TimeoutException {
+      _fail('La caméra ne répond plus. Relancez l\'application.');
     }
   }
 
   Future<void> _closeSegment() async {
-    final file = await camera.stopVideoRecording();
+    final file = await camera.stopVideoRecording().timeout(_cameraTimeout);
     final end = DateTime.now().toUtc();
     final start = _segmentStart!;
     _previousEnd = end;

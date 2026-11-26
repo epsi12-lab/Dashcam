@@ -35,12 +35,18 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
   Uploader? _uploader;
   LocalRetention? _retention;
   Directory? _segmentsDir;
+  /// Moment où l'application a cessé d'être visible.
+  DateTime? _hiddenAt;
 
   // Caméra et enregistreur, recréés à chaque retour au premier plan.
   CameraDescription? _backCamera;
   CameraController? _camera;
   DashcamRecorder? _recorder;
   bool _opening = false;
+  /// Vrai si l'enregistrement tournait quand l'application a été masquée.
+  bool _resumeRecording = false;
+  /// File des opérations sur la caméra : une seule à la fois, dans l'ordre.
+  Future<void> _cameraOps = Future.value();
   String _status = 'Préparation…';
 
   @override
@@ -56,17 +62,57 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
-    _releaseCamera();
+    _enqueue(_release);
     super.dispose();
   }
 
-  @override
+    @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive) {
-      _releaseCamera();
-    } else if (state == AppLifecycleState.resumed) {
-      if (_camera == null && _backCamera != null) _openCamera();
+    switch (state) {
+      case AppLifecycleState.inactive:
+        // Perte de focus (capture d'écran, notifications, départ en arrière-plan) :
+        // on termine le segment tant que la caméra est encore active.
+        _enqueue(_pauseRecording);
+      case AppLifecycleState.hidden:
+        _hiddenAt = DateTime.now();
+        _enqueue(_release);
+      case AppLifecycleState.resumed:
+        _enqueue(_resume);
+      default:
+        break;
     }
+  }
+
+  /// Termine proprement l'enregistrement en cours, en retenant qu'il tournait.
+  Future<void> _pauseRecording() async {
+    final recorder = _recorder;
+    if (recorder == null || !recorder.state.value.recording) return;
+    _resumeRecording = true;
+    await recorder.stop();
+    WakelockPlus.disable();
+  }
+
+  /// Rouvre la caméra si elle a été libérée, puis reprend l'enregistrement
+  /// si l'absence a été courte. Après une longue absence, la reprise
+  /// automatique échoue sur ce téléphone : on demande un démarrage manuel.
+  Future<void> _resume() async {
+    final hiddenAt = _hiddenAt;
+    _hiddenAt = null;
+    final longAbsence = hiddenAt != null &&
+        DateTime.now().difference(hiddenAt) > const Duration(seconds: 15);
+
+    if (_camera == null && _backCamera != null) await _openCamera();
+    final recorder = _recorder;
+    if (!_resumeRecording || recorder == null) return;
+    _resumeRecording = false;
+
+    if (longAbsence) {
+      recorder.state.value = recorder.state.value.copyWith(
+          error: 'Enregistrement interrompu pendant l\'absence. Touchez « Démarrer ».');
+      return;
+    }
+    WakelockPlus.enable();
+    await recorder.start();
   }
 
   Future<void> _prepare() async {
@@ -109,7 +155,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
       );
-      await _openCamera();
+      await _enqueue(_openCamera);
     } on Exception catch (e) {
       if (mounted) setState(() => _status = 'Échec de la préparation : $e');
     }
@@ -146,13 +192,28 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
       });
     } on CameraException catch (e) {
       if (mounted) setState(() => _status = 'Caméra indisponible : ${e.description}');
+    } on Object catch (e) {
+      if (mounted) setState(() => _status = 'Ouverture impossible : $e');
     } finally {
       _opening = false;
     }
   }
 
+  /// Ajoute une opération à la file. Une erreur est journalisée
+  /// mais ne bloque pas les opérations suivantes.
+  Future<void> _enqueue(Future<void> Function() op) {
+    _cameraOps = _cameraOps.then((_) async {
+      try {
+        await op();
+      } on Object catch (e) {
+        debugPrint('Opération caméra en échec : $e');
+      }
+    });
+    return _cameraOps;
+  }
+
   /// Termine proprement le segment en cours, puis libère la caméra.
-  Future<void> _releaseCamera() async {
+  Future<void> _release() async {
     final recorder = _recorder;
     final camera = _camera;
     if (mounted) {
