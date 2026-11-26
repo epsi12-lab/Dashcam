@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../supabase_fingerprint_repository.dart';
 import '../verification_service.dart';
 import 'verdict_style.dart';
+import 'video_dialog.dart';
 
 class VerificationPage extends StatefulWidget {
   const VerificationPage({super.key});
@@ -21,6 +22,7 @@ class _VerificationPageState extends State<VerificationPage>
   );
 
   List<SegmentResult> _results = const [];
+  List<PlatformFile> _files = const [];
   (int, int)? _progress;
   Duration? _duration;
   bool _busy = false;
@@ -38,6 +40,7 @@ Future<void> _pickAndVerify() async {
       _busy = true;
       _error = null;
       _results = const [];
+      _files = files;
       _progress = (0, files.length);
     });
 
@@ -129,7 +132,7 @@ Future<void> _pickAndVerify() async {
           if (_results.isNotEmpty) ...[
             _Summary(results: _results, duration: _duration),
             const SizedBox(height: 8),
-            Expanded(child: _ResultsTable(results: _results)),
+            Expanded(child: _ResultsTable(results: _results, files: _files)),
           ],
           if (!_busy && _results.isEmpty && _error == null)
             const Expanded(
@@ -178,9 +181,12 @@ class _Summary extends StatelessWidget {
 
 /// Tableau des résultats : un fichier par ligne.
 class _ResultsTable extends StatelessWidget {
-  const _ResultsTable({required this.results});
+  const _ResultsTable({required this.results, required this.files});
 
   final List<SegmentResult> results;
+
+  /// Fichiers choisis, dans le même ordre que les résultats.
+  final List<PlatformFile> files;
 
   @override
   Widget build(BuildContext context) {
@@ -193,27 +199,40 @@ class _ResultsTable extends StatelessWidget {
             DataColumn(label: Text('Verdict')),
             DataColumn(label: Text('Alertes')),
             DataColumn(label: Text('Explication')),
+            DataColumn(label: Text('Vidéo')),
           ],
           rows: [
-            for (final r in results)
-              DataRow(cells: [
-                DataCell(Tooltip(
-                    message: r.fileName, child: Text(shortSegmentName(r.fileName)))),
-                DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(r.verdict.icon, color: r.verdict.color, size: 18),
-                  const SizedBox(width: 6),
-                  Text(r.verdict.label,
-                      style: TextStyle(
-                          color: r.verdict.color, fontWeight: FontWeight.bold)),
-                ])),
-                DataCell(Text(r.alerts.isEmpty
-                    ? 'Aucune'
-                    : r.alerts.map((a) => a.label).join(', '))),
-                DataCell(SizedBox(width: 420, child: Text(r.reason))),
-              ]),
+            for (var i = 0; i < results.length; i++)
+              _row(context, results[i], i < files.length ? files[i] : null),
           ],
         ),
       ),
     );
   }
+
+  DataRow _row(BuildContext context, SegmentResult r, PlatformFile? file) => DataRow(cells: [
+        DataCell(Tooltip(message: r.fileName, child: Text(shortSegmentName(r.fileName)))),
+        DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(r.verdict.icon, color: r.verdict.color, size: 18),
+          const SizedBox(width: 6),
+          Text(r.verdict.label,
+              style: TextStyle(color: r.verdict.color, fontWeight: FontWeight.bold)),
+        ])),
+        DataCell(Text(
+            r.alerts.isEmpty ? 'Aucune' : r.alerts.map((a) => a.label).join(', '))),
+        DataCell(SizedBox(width: 420, child: Text(r.reason))),
+        DataCell(file == null
+            ? const SizedBox.shrink()
+            : IconButton(
+                tooltip: 'Visionner',
+                icon: const Icon(Icons.play_circle),
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => VideoDialog(
+                    fileName: r.fileName,
+                    loadBytes: file.readAsBytes,
+                  ),
+                ),
+              )),
+      ]);
 }

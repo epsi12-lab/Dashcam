@@ -39,6 +39,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   supabase_flutter: ^2.18.3
   file_picker: ^13.3.2
+  video_player: ^2.11.1
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:
