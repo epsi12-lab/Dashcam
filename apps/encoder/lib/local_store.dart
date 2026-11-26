@@ -133,4 +133,32 @@ class LocalStore {
 
   static Fingerprint _decode(String payload) =>
       Fingerprint.fromInsertJson(jsonDecode(payload) as Map<String, Object?>);
+  
+  /// Fenêtres protégées, de la plus récente à la plus ancienne.
+  Future<List<({DateTime start, DateTime end})>> protectedWindows() async {
+    final rows = await _db.query('protected_windows', orderBy: 'starts_at_ms desc');
+    return [
+      for (final row in rows)
+        (
+          start: DateTime.fromMillisecondsSinceEpoch(row['starts_at_ms']! as int, isUtc: true),
+          end: DateTime.fromMillisecondsSinceEpoch(row['ends_at_ms']! as int, isUtc: true),
+        ),
+    ];
+  }
+
+  /// Segments qui chevauchent l'intervalle [start, end], dans l'ordre.
+  Future<List<({int seq, String fileName})>> segmentsBetween(
+      DateTime start, DateTime end) async {
+    final rows = await _db.query(
+      'segments',
+      columns: ['seq', 'file_name'],
+      where: 'started_at_ms < ? and ended_at_ms > ?',
+      whereArgs: [end.millisecondsSinceEpoch, start.millisecondsSinceEpoch],
+      orderBy: 'seq',
+    );
+    return [
+      for (final row in rows)
+        (seq: row['seq']! as int, fileName: row['file_name']! as String),
+    ];
+  }
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -30,6 +31,7 @@ class RecorderPage extends StatefulWidget {
 class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver {
   // Services, créés une fois.
   SegmentProcessor? _processor;
+  LocalStore? _store;
   Uploader? _uploader;
   LocalRetention? _retention;
   Directory? _segmentsDir;
@@ -79,6 +81,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
 
       final db = await openDatabase(p.join(await getDatabasesPath(), 'encoder.db'));
       final store = await LocalStore.open(db);
+      _store = store;
       final docs = await getApplicationDocumentsDirectory();
       final segmentsDir = Directory(p.join(docs.path, 'segments'));
       await segmentsDir.create(recursive: true);
@@ -188,6 +191,76 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
     ));
   }
 
+  /// Propose les incidents protégés et les 5 dernières minutes.
+  Future<void> _chooseExport() async {
+    final store = _store;
+    if (store == null) return;
+    final incidents = await store.protectedWindows();
+    if (!mounted) return;
+
+    final choice = await showModalBottomSheet<({DateTime start, DateTime end})>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const ListTile(
+              title: Text('Exporter des segments'),
+              subtitle: Text('Les fichiers sont partagés tels quels. Préférez l\'email, '
+                  'Google Drive ou une copie directe : certaines messageries '
+                  'recompressent les vidéos, ce qui change leur empreinte.'),
+            ),
+            for (final w in incidents)
+              ListTile(
+                leading: const Icon(Icons.shield),
+                title: Text('Incident du ${_clock(w.start.add(const Duration(seconds: 60)))}'),
+              ),
+            ListTile(
+              leading: const Icon(Icons.history),
+              title: const Text('Les 5 dernières minutes'),
+              onTap: () {
+                final now = DateTime.now().toUtc();
+                Navigator.pop(
+                    context, (start: now.subtract(const Duration(minutes: 5)), end: now));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice != null) await _export(store, choice.start, choice.end);
+  }
+
+  /// Partage, via le partage natif d'Android, les segments de l'intervalle.
+  Future<void> _export(LocalStore store, DateTime start, DateTime end) async {
+    final dir = _segmentsDir;
+    if (dir == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+
+    final files = <XFile>[];
+    for (final segment in await store.segmentsBetween(start, end)) {
+      final file = File(p.join(dir.path, segment.fileName));
+      if (await file.exists()) files.add(XFile(file.path, mimeType: 'video/mp4'));
+    }
+    if (files.isEmpty) {
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Aucun segment enregistré sur cette période.')));
+      return;
+    }
+
+    await SharePlus.instance.share(ShareParams(
+      files: files,
+      subject: 'Dashcam : ${files.length} segment(s)',
+    ));
+  }
+
+  /// Date et heure locales du téléphone, au format jj/mm à hh:mm.
+  static String _clock(DateTime t) {
+    final local = t.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(local.day)}/${two(local.month)} à ${two(local.hour)}:${two(local.minute)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final camera = _camera;
@@ -211,6 +284,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
                         state: s,
                         onToggle: _toggleRecording,
                         onProtect: _protectIncident,
+                        onExport: s.recording ? null : _chooseExport,
                         onSignOut: s.recording
                             ? null
                             : () => Supabase.instance.client.auth.signOut(),
@@ -231,12 +305,14 @@ class _Panel extends StatelessWidget {
     required this.onToggle,
     required this.onProtect,
     required this.onSignOut,
+    required this.onExport,
   });
 
   final RecorderState state;
   final VoidCallback onToggle;
   final VoidCallback onProtect;
   final VoidCallback? onSignOut;
+  final VoidCallback? onExport;
 
   @override
   Widget build(BuildContext context) {
@@ -275,6 +351,12 @@ class _Panel extends StatelessWidget {
             onPressed: state.recording ? onProtect : null,
             icon: const Icon(Icons.shield),
             label: const Text('Protéger un incident'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: onExport,
+            icon: const Icon(Icons.ios_share),
+            label: const Text('Exporter'),
           ),
           const SizedBox(height: 8),
           TextButton.icon(
