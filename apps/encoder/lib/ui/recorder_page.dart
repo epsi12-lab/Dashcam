@@ -311,7 +311,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
 
     await SharePlus.instance.share(ShareParams(
       files: files,
-      subject: 'Dashcam : ${files.length} segment(s)',
+      subject: 'PreuvCam : ${files.length} segment(s)',
     ));
   }
 

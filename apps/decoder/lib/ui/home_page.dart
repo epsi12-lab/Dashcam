@@ -15,7 +15,7 @@ class HomePage extends StatelessWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(AppConfig.isDemo ? 'Dashcam Assureur (démo)' : 'Dashcam Assureur'),
+          title: Text(AppConfig.isDemo ? 'PreuvCam Assureur (démo)' : 'PreuvCam Assureur'),
           actions: [
             Center(child: Text(auth.currentUser?.email ?? '')),
             IconButton(

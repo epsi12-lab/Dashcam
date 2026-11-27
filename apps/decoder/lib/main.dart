@@ -27,7 +27,7 @@ class DecoderApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = Supabase.instance.client.auth;
     return MaterialApp(
-      title: 'Dashcam Assureur',
+      title: 'PreuvCam Assureur',
       theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
       // Reconstruit l'écran à chaque connexion ou déconnexion.
       home: StreamBuilder<AuthState>(

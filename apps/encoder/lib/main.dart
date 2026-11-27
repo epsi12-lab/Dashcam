@@ -27,7 +27,7 @@ class EncoderApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = Supabase.instance.client.auth;
     return MaterialApp(
-      title: 'Dashcam Conducteur',
+      title: 'PreuvCam',
       theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
       home: StreamBuilder<AuthState>(
         stream: auth.onAuthStateChange,

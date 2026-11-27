@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
     
     <application
-        android:label="dashcam_encoder"
+        android:label="PreuvCam"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
