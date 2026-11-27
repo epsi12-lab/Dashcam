@@ -20,6 +20,7 @@ abstract final class Palette {
   static const errorFg = Color(0xFFA3271C);
   static const neutralBg = Color(0xFFEEF2F1);
   static const neutralFg = Color(0xFF33413E);
+  static const panel = Color(0xFFF7FAF9);
 }
 
 /// Largeur en dessous de laquelle on passe en mise en page compacte.
