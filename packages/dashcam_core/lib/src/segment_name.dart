@@ -1,4 +1,4 @@
-/// Motif d'un uuid en minuscules, comme ceux générés par l'application.
+/// Motif d'un UUID en minuscules, tel que ceux générés par l'application.
 const _uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 
 final _uuidPattern = RegExp('^$_uuid\$');
@@ -18,10 +18,11 @@ class SegmentName {
   final String deviceId;
   final int seq;
 
-  /// Nom du fichier, numéro complété à 6 chiffres pour un tri correct.
+  /// Nom du fichier, avec un numéro complété à six chiffres pour que l'ordre
+  /// alphabétique suive l'ordre des segments.
   String get fileName => '${deviceId}_${seq.toString().padLeft(6, '0')}.mp4';
 
-  /// Relit un nom de fichier. Renvoie `null` si le nom n'est pas valide.
+  /// Analyse un nom de fichier. Renvoie `null` si le nom n'est pas valide.
   static SegmentName? tryParse(String fileName) {
     final match = _fileNamePattern.firstMatch(fileName);
     if (match == null) return null;

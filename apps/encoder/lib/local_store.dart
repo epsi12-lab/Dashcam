@@ -4,13 +4,13 @@ import 'package:dashcam_core/dashcam_core.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// Stockage local de l'encodeur : état de la chaîne, file d'attente des
-/// empreintes à envoyer, et liste des segments enregistrés.
+/// empreintes à envoyer et liste des segments enregistrés.
 class LocalStore {
   LocalStore._(this._db);
 
   final Database _db;
 
-  /// Prépare les tables si besoin et renvoie le stockage.
+  /// Crée les tables si nécessaire et renvoie le stockage.
   static Future<LocalStore> open(Database db) async {
     await db.execute('''
       create table if not exists chain_state (
@@ -22,7 +22,7 @@ class LocalStore {
         seq integer primary key,
         payload text not null
       )''');
-        await db.execute('''
+    await db.execute('''
       create table if not exists segments (
         seq integer primary key,
         file_name text not null,
@@ -45,20 +45,19 @@ class LocalStore {
     return _decode(rows.single['last_fingerprint']! as String);
   }
 
-  /// Enregistre un segment : chaîne, file d'attente et liste des segments
-  /// sont mises à jour ensemble, ou pas du tout.
+  /// Enregistre un segment : la chaîne, la file d'attente et la liste des
+  /// segments sont mises à jour ensemble, ou pas du tout.
   Future<void> recordSegment(Fingerprint fp) async {
     final json = fp.toInsertJson();
     final payload = jsonEncode(json);
 
     await _db.transaction((txn) async {
-      await txn.insert(
-        'chain_state',
-        {'id': 1, 'last_fingerprint': payload},
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('chain_state', {
+        'id': 1,
+        'last_fingerprint': payload,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
       await txn.insert('upload_queue', {'seq': fp.seq, 'payload': payload});
-            await txn.insert('segments', {
+      await txn.insert('segments', {
         'seq': fp.seq,
         'file_name': SegmentName(deviceId: fp.deviceId, seq: fp.seq).fileName,
         'started_at_ms': fp.startedAt.millisecondsSinceEpoch,
@@ -75,7 +74,10 @@ class LocalStore {
 
   /// Nombre d'empreintes en attente d'envoi.
   Future<int> pendingCount() async =>
-      Sqflite.firstIntValue(await _db.rawQuery('select count(*) from upload_queue')) ?? 0;
+      Sqflite.firstIntValue(
+        await _db.rawQuery('select count(*) from upload_queue'),
+      ) ??
+      0;
 
   /// Retire une empreinte de la file une fois sa réception confirmée.
   Future<void> markUploaded(int seq) async {
@@ -84,11 +86,15 @@ class LocalStore {
 
   /// Noms des fichiers des segments enregistrés, dans l'ordre.
   Future<List<String>> segmentFileNames() async {
-    final rows = await _db.query('segments', columns: ['file_name'], orderBy: 'seq');
+    final rows = await _db.query(
+      'segments',
+      columns: ['file_name'],
+      orderBy: 'seq',
+    );
     return [for (final row in rows) row['file_name']! as String];
   }
 
-    /// Enregistre une fenêtre de temps dont les segments ne seront jamais purgés.
+  /// Enregistre une fenêtre de temps dont les segments ne seront jamais purgés.
   Future<void> addProtectedWindow(DateTime start, DateTime end) async {
     await _db.insert('protected_windows', {
       'starts_at_ms': start.millisecondsSinceEpoch,
@@ -108,7 +114,8 @@ class LocalStore {
   Future<List<({int seq, String fileName})>> _unprotectedSegments({
     DateTime? endedBefore,
   }) async {
-    final rows = await _db.rawQuery('''
+    final rows = await _db.rawQuery(
+      '''
       select seq, file_name from segments s
       where (? is null or s.ended_at_ms < ?)
         and not exists (
@@ -116,10 +123,12 @@ class LocalStore {
           where w.starts_at_ms < s.ended_at_ms
             and w.ends_at_ms > s.started_at_ms
         )
-      order by seq''', [
-      endedBefore?.millisecondsSinceEpoch,
-      endedBefore?.millisecondsSinceEpoch,
-    ]);
+      order by seq''',
+      [
+        endedBefore?.millisecondsSinceEpoch,
+        endedBefore?.millisecondsSinceEpoch,
+      ],
+    );
     return [
       for (final row in rows)
         (seq: row['seq']! as int, fileName: row['file_name']! as String),
@@ -133,22 +142,33 @@ class LocalStore {
 
   static Fingerprint _decode(String payload) =>
       Fingerprint.fromInsertJson(jsonDecode(payload) as Map<String, Object?>);
-  
+
   /// Fenêtres protégées, de la plus récente à la plus ancienne.
   Future<List<({DateTime start, DateTime end})>> protectedWindows() async {
-    final rows = await _db.query('protected_windows', orderBy: 'starts_at_ms desc');
+    final rows = await _db.query(
+      'protected_windows',
+      orderBy: 'starts_at_ms desc',
+    );
     return [
       for (final row in rows)
         (
-          start: DateTime.fromMillisecondsSinceEpoch(row['starts_at_ms']! as int, isUtc: true),
-          end: DateTime.fromMillisecondsSinceEpoch(row['ends_at_ms']! as int, isUtc: true),
+          start: DateTime.fromMillisecondsSinceEpoch(
+            row['starts_at_ms']! as int,
+            isUtc: true,
+          ),
+          end: DateTime.fromMillisecondsSinceEpoch(
+            row['ends_at_ms']! as int,
+            isUtc: true,
+          ),
         ),
     ];
   }
 
   /// Segments qui chevauchent l'intervalle [start, end], dans l'ordre.
   Future<List<({int seq, String fileName})>> segmentsBetween(
-      DateTime start, DateTime end) async {
+    DateTime start,
+    DateTime end,
+  ) async {
     final rows = await _db.query(
       'segments',
       columns: ['seq', 'file_name'],

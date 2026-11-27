@@ -1,7 +1,7 @@
 -- Planificateur de tâches intégré à PostgreSQL
 create extension if not exists pg_cron;
 
--- Supprime les empreintes non gelées reçues depuis plus longtemps que la rétention.
+-- Supprime les empreintes non gelées reçues depuis plus longtemps que la durée de rétention.
 -- Renvoie le nombre d'empreintes supprimées.
 create function private.purge_expired_fingerprints(retention interval)
 returns integer
@@ -20,10 +20,10 @@ begin
 end;
 $$;
 
--- Aucun utilisateur de l'API ne peut déclencher la purge
+-- Aucun utilisateur de l'API ne peut déclencher la purge.
 revoke all on function private.purge_expired_fingerprints(interval) from public;
 
--- Tous les jours à 03h17 (heure UTC), rétention de 30 jours
+-- Tous les jours à 3 h 17 (UTC), avec une rétention de 30 jours.
 select cron.schedule(
   'purge-expired-fingerprints',
   '17 3 * * *',

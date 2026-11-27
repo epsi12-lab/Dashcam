@@ -8,8 +8,9 @@ import 'package:uuid/uuid.dart';
 /// Simulateur d'encodeur pour la démonstration : produit des segments
 /// factices au rythme réel et envoie leurs empreintes à Supabase.
 ///
-/// Options : --count N (5), --duration S (10), --out DOSSIER (demo_videos),
-/// --late (le dernier envoi est retardé de 40 s).
+/// Options, avec leur valeur par défaut entre parenthèses : `--count N` (5),
+/// `--duration S` (10), `--out DOSSIER` (demo_videos) et `--late` (le dernier
+/// envoi est retardé de 40 s).
 Future<void> main(List<String> args) async {
   final env = Platform.environment;
   final url = env['SUPABASE_URL'] ?? 'http://127.0.0.1:54321';
@@ -50,7 +51,7 @@ Future<void> main(List<String> args) async {
         ? Fingerprint.first(deviceId: deviceId, segmentHash: hash, startedAt: start, endedAt: end)
         : fp.next(segmentHash: hash, startedAt: start, endedAt: end);
 
-    // On attend la fin réelle du segment, comme une vraie dashcam.
+    // Attente de la fin réelle du segment, comme sur une vraie dashcam.
     final wait = end.difference(DateTime.now().toUtc());
     if (!wait.isNegative) await Future<void>.delayed(wait);
 
@@ -67,7 +68,7 @@ Future<void> main(List<String> args) async {
   await client.dispose();
 }
 
-/// Valeur qui suit [name] dans les arguments, ou null.
+/// Valeur qui suit [name] dans les arguments, ou `null` si elle est absente.
 String? _option(List<String> args, String name) {
   final i = args.indexOf(name);
   return i >= 0 && i + 1 < args.length ? args[i + 1] : null;

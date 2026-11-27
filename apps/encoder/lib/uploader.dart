@@ -61,7 +61,8 @@ class Uploader {
           return FlushReport(
             sent: sent,
             remaining: await store.pendingCount(),
-            error: 'Empreinte ${fp.seq} refusée : ${result.message ?? 'raison inconnue'}',
+            error:
+                'Empreinte ${fp.seq} refusée : ${result.message ?? 'raison inconnue'}',
           );
       }
     }

@@ -42,7 +42,7 @@ create table public.fingerprints (
 
 create index fingerprints_received_at_idx on public.fingerprints (received_at);
 
--- Sécurité par défaut : tout est interdit tant qu'aucune règle n'autorise
+-- Sécurité par défaut : tout accès est refusé tant qu'aucune politique ne l'autorise.
 alter table public.insurers enable row level security;
 
 alter table public.profiles enable row level security;

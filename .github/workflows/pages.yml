@@ -50,6 +50,7 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      # deploy-pages lit l'artefact de construction par son identifiant
       actions: read
     environment:
       name: github-pages

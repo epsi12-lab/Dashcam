@@ -11,7 +11,7 @@ import 'local_retention.dart';
 import 'segment_processor.dart';
 import 'uploader.dart';
 
-/// État de l'enregistrement, affiché par l'écran.
+/// État de l'enregistrement, affiché à l'écran.
 @immutable
 class RecorderState {
   const RecorderState({
@@ -51,21 +51,20 @@ class RecorderState {
     Duration? lastHashTime,
     DateTime? startedAt,
     bool clearStartedAt = false,
-  }) =>
-      RecorderState(
-        recording: recording ?? this.recording,
-        lastSeq: lastSeq ?? this.lastSeq,
-        pending: pending ?? this.pending,
-        offline: offline ?? this.offline,
-        error: clearError ? null : (error ?? this.error),
-        lastGap: lastGap ?? this.lastGap,
-        lastHashTime: lastHashTime ?? this.lastHashTime,
-        startedAt: clearStartedAt ? null : (startedAt ?? this.startedAt),
-      );
+  }) => RecorderState(
+    recording: recording ?? this.recording,
+    lastSeq: lastSeq ?? this.lastSeq,
+    pending: pending ?? this.pending,
+    offline: offline ?? this.offline,
+    error: clearError ? null : (error ?? this.error),
+    lastGap: lastGap ?? this.lastGap,
+    lastHashTime: lastHashTime ?? this.lastHashTime,
+    startedAt: clearStartedAt ? null : (startedAt ?? this.startedAt),
+  );
 }
 
-/// Enregistre la vidéo en segments enchaînés et traite chacun d'eux :
-/// empreinte, rangement du fichier, envoi, purge locale.
+/// Enregistre la vidéo en segments successifs et traite chacun d'eux :
+/// calcul de l'empreinte, rangement du fichier, envoi et purge locale.
 class DashcamRecorder {
   DashcamRecorder({
     required this.camera,
@@ -90,10 +89,10 @@ class DashcamRecorder {
   DateTime? _segmentStart;
   DateTime? _previousEnd;
 
-  /// Au-delà, on considère que la caméra ne répond plus.
+  /// Délai au-delà duquel la caméra est considérée comme ne répondant plus.
   static const _cameraTimeout = Duration(seconds: 5);
 
-  /// Traitements en cours, enchaînés : un segment à la fois, dans l'ordre.
+  /// Traitements en cours, chaînés : un segment à la fois, dans l'ordre.
   Future<void> _pending = Future.value();
 
   Future<void> start() async {
@@ -102,8 +101,11 @@ class DashcamRecorder {
     state.value = state.value.copyWith(clearError: true);
     try {
       await _startSegment();
-      // « Enregistrement » seulement une fois le démarrage confirmé.
-      state.value = state.value.copyWith(recording: true, startedAt: DateTime.now());
+      // L'état « Enregistrement » n'est affiché qu'une fois le démarrage confirmé.
+      state.value = state.value.copyWith(
+        recording: true,
+        startedAt: DateTime.now(),
+      );
     } on CameraException catch (e) {
       _fail('Démarrage impossible : ${e.description}');
     } on TimeoutException {
@@ -119,9 +121,13 @@ class DashcamRecorder {
     try {
       if (camera.value.isRecordingVideo) await _closeSegment();
     } on CameraException catch (e) {
-      state.value = state.value.copyWith(error: 'Arrêt incomplet : ${e.description}');
+      state.value = state.value.copyWith(
+        error: 'Arrêt incomplet : ${e.description}',
+      );
     } on TimeoutException {
-      state.value = state.value.copyWith(error: 'Arrêt incomplet : la caméra ne répond pas.');
+      state.value = state.value.copyWith(
+        error: 'Arrêt incomplet : la caméra ne répond pas.',
+      );
     }
     await _pending;
     state.value = state.value.copyWith(recording: false, clearStartedAt: true);
@@ -137,7 +143,9 @@ class DashcamRecorder {
     final start = DateTime.now().toUtc();
     final previousEnd = _previousEnd;
     if (previousEnd != null) {
-      state.value = state.value.copyWith(lastGap: start.difference(previousEnd));
+      state.value = state.value.copyWith(
+        lastGap: start.difference(previousEnd),
+      );
     }
     _segmentStart = start;
     _timer = Timer(segmentDuration, _rollSegment);
@@ -163,17 +171,30 @@ class DashcamRecorder {
     _pending = _pending.then((_) => _processSegment(file.path, start, end));
   }
 
-  Future<void> _processSegment(String path, DateTime start, DateTime end) async {
+  Future<void> _processSegment(
+    String path,
+    DateTime start,
+    DateTime end,
+  ) async {
     try {
-      // Hachage dans un isolate : l'aperçu de la caméra ne fige pas.
+      // Hachage dans un isolate, pour que l'aperçu de la caméra ne se fige pas.
       final watch = Stopwatch()..start();
-      final hash = await Isolate.run(() => sha256OfStream(File(path).openRead()));
+      final hash = await Isolate.run(
+        () => sha256OfStream(File(path).openRead()),
+      );
       final hashTime = watch.elapsed;
 
-      final fp = await processor.record(segmentHash: hash, startedAt: start, endedAt: end);
+      final fp = await processor.record(
+        segmentHash: hash,
+        startedAt: start,
+        endedAt: end,
+      );
       final name = SegmentName(deviceId: fp.deviceId, seq: fp.seq).fileName;
       await _move(path, p.join(segmentsDir.path, name));
-      state.value = state.value.copyWith(lastSeq: fp.seq, lastHashTime: hashTime);
+      state.value = state.value.copyWith(
+        lastSeq: fp.seq,
+        lastHashTime: hashTime,
+      );
 
       final report = await uploader.flush();
       await retention.run();
@@ -184,7 +205,8 @@ class DashcamRecorder {
         clearError: report.error == null,
       );
     } on Object catch (e) {
-      // Un segment en échec ne doit pas bloquer les suivants : on l'affiche.
+      // Un segment en échec ne doit pas bloquer les suivants : l'erreur est
+      // seulement affichée.
       state.value = state.value.copyWith(error: 'Segment non traité : $e');
     }
   }
@@ -192,14 +214,18 @@ class DashcamRecorder {
   void _fail(String message) {
     _running = false;
     _timer?.cancel();
-    state.value = state.value.copyWith(recording: false, error: message, clearStartedAt: true);
+    state.value = state.value.copyWith(
+      recording: false,
+      error: message,
+      clearStartedAt: true,
+    );
   }
 
   static Future<void> _move(String from, String to) async {
     try {
       await File(from).rename(to);
     } on FileSystemException {
-      // Dossiers sur des partitions différentes : copie puis suppression.
+      // Dossiers situés sur des partitions différentes : copie puis suppression.
       await File(from).copy(to);
       await File(from).delete();
     }

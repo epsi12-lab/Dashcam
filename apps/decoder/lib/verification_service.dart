@@ -4,7 +4,7 @@ import 'package:dashcam_core/dashcam_core.dart';
 
 import 'fingerprint_repository.dart';
 
-/// Fichier choisi par l'agent : son nom et son contenu, lu en flux.
+/// Fichier choisi par l'agent : son nom et son contenu, lu sous forme de flux.
 class PickedSegment {
   const PickedSegment({required this.fileName, required this.content});
 
@@ -36,14 +36,16 @@ class VerificationService {
     // 1. Hachage, un fichier après l'autre.
     final provided = <ProvidedSegment>[];
     for (final file in files) {
-      provided.add(ProvidedSegment(
-        fileName: file.fileName,
-        computedHash: await sha256OfStream(file.content),
-      ));
+      provided.add(
+        ProvidedSegment(
+          fileName: file.fileName,
+          computedHash: await sha256OfStream(file.content),
+        ),
+      );
       onProgress?.call(provided.length, files.length);
     }
 
-    // 2. Plage de numéros fournie pour chaque appareil.
+    // 2. Plage des numéros fournis pour chaque appareil.
     final ranges = <String, ({int first, int last})>{};
     for (final segment in provided) {
       final name = SegmentName.tryParse(segment.fileName);
@@ -51,20 +53,25 @@ class VerificationService {
       final range = ranges[name.deviceId];
       ranges[name.deviceId] = range == null
           ? (first: name.seq, last: name.seq)
-          : (first: min(range.first, name.seq), last: max(range.last, name.seq));
+          : (
+              first: min(range.first, name.seq),
+              last: max(range.last, name.seq),
+            );
     }
 
-    // 3. Empreintes de référence, plage élargie de la marge.
+    // 3. Empreintes de référence, sur la plage élargie de la marge.
     final stored = <StoredFingerprint>[];
     for (final MapEntry(key: deviceId, value: range) in ranges.entries) {
-      stored.addAll(await repository.fetchRange(
-        deviceId: deviceId,
-        fromSeq: max(1, range.first - margin),
-        toSeq: range.last + margin,
-      ));
+      stored.addAll(
+        await repository.fetchRange(
+          deviceId: deviceId,
+          fromSeq: max(1, range.first - margin),
+          toSeq: range.last + margin,
+        ),
+      );
     }
 
-    // 4. Vérification, par le module commun.
+    // 4. Vérification par le module commun.
     return verifySegments(
       provided: provided,
       stored: stored,

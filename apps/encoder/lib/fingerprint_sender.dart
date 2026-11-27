@@ -5,13 +5,13 @@ enum SendStatus {
   /// L'empreinte vient d'être enregistrée.
   stored,
 
-  /// L'empreinte était déjà enregistrée (réponse d'un envoi précédent perdue).
+  /// L'empreinte était déjà enregistrée (la réponse d'un envoi précédent a été perdue).
   duplicate,
 
-  /// Serveur injoignable : réessayer plus tard.
+  /// Serveur injoignable : l'envoi sera retenté plus tard.
   networkError,
 
-  /// Le serveur refuse l'empreinte : erreur à signaler, pas à réessayer.
+  /// Le serveur refuse l'empreinte : l'erreur doit être signalée, sans nouvel essai.
   rejected,
 }
 
@@ -24,7 +24,7 @@ class SendResult {
 }
 
 /// Envoie une empreinte au serveur. Une implémentation ne lève jamais
-/// d'exception : toute issue est traduite en [SendResult].
+/// d'exception : chaque issue est traduite en [SendResult].
 abstract interface class FingerprintSender {
   Future<SendResult> send(Fingerprint fp);
 }

@@ -3,15 +3,19 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 /// Motif discret de boucliers et d'empreintes, pour la bande de couleur
-/// des écrans de connexion. Aucun texte n'est posé dessus : il ne gêne
-/// pas la lecture.
+/// des écrans de connexion. Aucun texte n'y est superposé : le motif ne gêne
+/// donc pas la lecture.
 class BrandPattern extends CustomPainter {
   const BrandPattern({this.color = const Color(0x17FFFFFF)});
 
   /// Blanc à environ 9 % d'opacité.
   final Color color;
 
-  static const _icons = [Icons.shield_outlined, Icons.fingerprint, Icons.shield_outlined];
+  static const _icons = [
+    Icons.shield_outlined,
+    Icons.fingerprint,
+    Icons.shield_outlined,
+  ];
   static const _step = 52.0;
   static const _size = 30.0;
 
@@ -39,19 +43,20 @@ class BrandPattern extends CustomPainter {
     }
   }
 
-  /// Une icône Material est un caractère d'une police : on la dessine comme du texte.
+  /// Une icône Material est un caractère d'une police : elle est donc dessinée
+  /// comme du texte.
   TextPainter _painterFor(IconData icon) => TextPainter(
-        text: TextSpan(
-          text: String.fromCharCode(icon.codePoint),
-          style: TextStyle(
-            fontFamily: icon.fontFamily,
-            package: icon.fontPackage,
-            fontSize: _size,
-            color: color,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
+    text: TextSpan(
+      text: String.fromCharCode(icon.codePoint),
+      style: TextStyle(
+        fontFamily: icon.fontFamily,
+        package: icon.fontPackage,
+        fontSize: _size,
+        color: color,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
 
   @override
   bool shouldRepaint(BrandPattern oldDelegate) => oldDelegate.color != color;

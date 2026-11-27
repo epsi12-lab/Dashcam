@@ -30,13 +30,15 @@ class RecorderPage extends StatefulWidget {
   State<RecorderPage> createState() => _RecorderPageState();
 }
 
-class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver {
-  // Services, créés une fois.
+class _RecorderPageState extends State<RecorderPage>
+    with WidgetsBindingObserver {
+  // Services, créés une seule fois.
   SegmentProcessor? _processor;
   LocalStore? _store;
   Uploader? _uploader;
   LocalRetention? _retention;
   Directory? _segmentsDir;
+
   /// Moment où l'application a cessé d'être visible.
   DateTime? _hiddenAt;
 
@@ -45,8 +47,10 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
   CameraController? _camera;
   DashcamRecorder? _recorder;
   bool _opening = false;
-  /// Vrai si l'enregistrement tournait quand l'application a été masquée.
+
+  /// Vrai si l'enregistrement était en cours quand l'application a été masquée.
   bool _resumeRecording = false;
+
   /// File des opérations sur la caméra : une seule à la fois, dans l'ordre.
   Future<void> _cameraOps = Future.value();
   String _status = 'Préparation…';
@@ -68,12 +72,12 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
     super.dispose();
   }
 
-    @override
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.inactive:
-        // Perte de focus (capture d'écran, notifications, départ en arrière-plan) :
-        // on termine le segment tant que la caméra est encore active.
+        // Perte du focus (capture d'écran, notifications, passage en arrière-plan) :
+        // le segment est terminé tant que la caméra est encore active.
         _enqueue(_pauseRecording);
       case AppLifecycleState.hidden:
         _hiddenAt = DateTime.now();
@@ -85,7 +89,8 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
     }
   }
 
-  /// Termine proprement l'enregistrement en cours, en retenant qu'il tournait.
+  /// Termine proprement l'enregistrement en cours, en mémorisant qu'il était
+  /// actif.
   Future<void> _pauseRecording() async {
     final recorder = _recorder;
     if (recorder == null || !recorder.state.value.recording) return;
@@ -96,11 +101,17 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
 
   /// Rouvre la caméra si elle a été libérée, puis reprend l'enregistrement
   /// si l'absence a été courte. Après une longue absence, la reprise
-  /// automatique échoue sur ce téléphone : on demande un démarrage manuel.
+  /// automatique échoue sur ce téléphone : un démarrage manuel est demandé.
   Future<void> _resume() async {
     final hiddenAt = _hiddenAt;
     _hiddenAt = null;
-    final longAbsence = hiddenAt != null &&
+
+    // Seuil mesuré sur le téléphone de test : la reprise automatique réussit
+    // après une absence de 20 s, mais échoue après environ une minute et
+    // bloque la caméra jusqu'au redémarrage de l'application. 15 s laisse une
+    // marge ; au-delà, l'utilisateur relance l'enregistrement lui-même.
+    final longAbsence =
+        hiddenAt != null &&
         DateTime.now().difference(hiddenAt) > const Duration(seconds: 15);
 
     if (_camera == null && _backCamera != null) await _openCamera();
@@ -110,7 +121,9 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
 
     if (longAbsence) {
       recorder.state.value = recorder.state.value.copyWith(
-          error: 'Enregistrement interrompu pendant l\'absence. Touchez « Démarrer ».');
+        error:
+            'Enregistrement interrompu pendant l\'absence. Touchez « Démarrer ».',
+      );
       return;
     }
     WakelockPlus.enable();
@@ -127,7 +140,9 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
       final deviceId = await loadOrCreateDeviceId(prefs);
       await registerDevice(client, deviceId);
 
-      final db = await openDatabase(p.join(await getDatabasesPath(), 'encoder.db'));
+      final db = await openDatabase(
+        p.join(await getDatabasesPath(), 'encoder.db'),
+      );
       final store = await LocalStore.open(db);
       _store = store;
       final docs = await getApplicationDocumentsDirectory();
@@ -136,7 +151,10 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
 
       _segmentsDir = segmentsDir;
       _processor = SegmentProcessor(store: store, deviceId: deviceId);
-      _uploader = Uploader(store: store, sender: SupabaseFingerprintSender(client));
+      _uploader = Uploader(
+        store: store,
+        sender: SupabaseFingerprintSender(client),
+      );
       _retention = LocalRetention(
         store: store,
         deleteFile: (name) async {
@@ -148,7 +166,9 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
           return await file.exists() ? await file.length() : 0;
         },
         now: () => DateTime.now().toUtc(),
-        retention: AppConfig.isDemo ? const Duration(minutes: 2) : const Duration(hours: 24),
+        retention: AppConfig.isDemo
+            ? const Duration(minutes: 2)
+            : const Duration(hours: 24),
         maxBytes: 2 * 1024 * 1024 * 1024, // 2 Go, soit environ 45 min en 720p
       );
 
@@ -171,7 +191,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
       final camera = CameraController(
         description,
         // 720p, pour la qualité de la preuve. Le débit (12 Mbit/s) est imposé
-        // par le profil du constructeur : ce téléphone ignore videoBitrate.
+        // par le profil du constructeur : ce téléphone ignore `videoBitrate`.
         ResolutionPreset.high,
         enableAudio: false,
       );
@@ -193,7 +213,9 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
         _status = 'Prêt à enregistrer.';
       });
     } on CameraException catch (e) {
-      if (mounted) setState(() => _status = 'Caméra indisponible : ${e.description}');
+      if (mounted) {
+        setState(() => _status = 'Caméra indisponible : ${e.description}');
+      }
     } on Object catch (e) {
       if (mounted) setState(() => _status = 'Ouverture impossible : $e');
     } finally {
@@ -201,8 +223,8 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
     }
   }
 
-  /// Ajoute une opération à la file. Une erreur est journalisée
-  /// mais ne bloque pas les opérations suivantes.
+  /// Ajoute une opération à la file. Une erreur est journalisée, mais ne
+  /// bloque pas les opérations suivantes.
   Future<void> _enqueue(Future<void> Function() op) {
     _cameraOps = _cameraOps.then((_) async {
       try {
@@ -248,24 +270,31 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
   Future<void> _protectIncident() async {
     await _retention?.protectIncident(DateTime.now().toUtc());
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      behavior: SnackBarBehavior.floating,
-      backgroundColor: Color(0xFFFFF4E5),
-      content: Row(children: [
-        Icon(Icons.verified_user_outlined, color: Palette.amber),
-        SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            'Incident protégé : la minute précédente et les 30 secondes suivantes '
-            'ne seront pas effacées.',
-            style: TextStyle(color: Palette.warnFg, fontWeight: FontWeight.w500),
-          ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Color(0xFFFFF4E5),
+        content: Row(
+          children: [
+            Icon(Icons.verified_user_outlined, color: Palette.amber),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Incident protégé : la minute précédente et les 30 secondes suivantes '
+                'ne seront pas effacées.',
+                style: TextStyle(
+                  color: Palette.warnFg,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
         ),
-      ]),
-    ));
+      ),
+    );
   }
 
-  /// Propose les incidents protégés et les 5 dernières minutes.
+  /// Propose les incidents protégés et les cinq dernières minutes.
   Future<void> _chooseExport() async {
     final store = _store;
     if (store == null) return;
@@ -280,22 +309,28 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
           children: [
             const ListTile(
               title: Text('Exporter des segments'),
-              subtitle: Text('Les fichiers sont partagés tels quels. Préférez l\'email, '
-                  'Google Drive ou une copie directe : certaines messageries '
-                  'recompressent les vidéos, ce qui change leur empreinte.'),
+              subtitle: Text(
+                'Les fichiers sont partagés tels quels. Préférez l\'email, '
+                'Google Drive ou une copie directe : certaines messageries '
+                'recompressent les vidéos, ce qui change leur empreinte.',
+              ),
             ),
             for (final w in incidents)
               ListTile(
                 leading: const Icon(Icons.shield),
-                title: Text('Incident du ${_clock(w.start.add(const Duration(seconds: 60)))}'),
+                title: Text(
+                  'Incident du ${_clock(w.start.add(const Duration(seconds: 60)))}',
+                ),
               ),
             ListTile(
               leading: const Icon(Icons.history),
               title: const Text('Les 5 dernières minutes'),
               onTap: () {
                 final now = DateTime.now().toUtc();
-                Navigator.pop(
-                    context, (start: now.subtract(const Duration(minutes: 5)), end: now));
+                Navigator.pop(context, (
+                  start: now.subtract(const Duration(minutes: 5)),
+                  end: now,
+                ));
               },
             ),
           ],
@@ -305,7 +340,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
     if (choice != null) await _export(store, choice.start, choice.end);
   }
 
-  /// Partage, via le partage natif d'Android, les segments de l'intervalle.
+  /// Partage les segments de l'intervalle via le partage natif d'Android.
   Future<void> _export(LocalStore store, DateTime start, DateTime end) async {
     final dir = _segmentsDir;
     if (dir == null) return;
@@ -314,18 +349,25 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
     final files = <XFile>[];
     for (final segment in await store.segmentsBetween(start, end)) {
       final file = File(p.join(dir.path, segment.fileName));
-      if (await file.exists()) files.add(XFile(file.path, mimeType: 'video/mp4'));
+      if (await file.exists()) {
+        files.add(XFile(file.path, mimeType: 'video/mp4'));
+      }
     }
     if (files.isEmpty) {
       messenger.showSnackBar(
-          const SnackBar(content: Text('Aucun segment enregistré sur cette période.')));
+        const SnackBar(
+          content: Text('Aucun segment enregistré sur cette période.'),
+        ),
+      );
       return;
     }
 
-    await SharePlus.instance.share(ShareParams(
-      files: files,
-      subject: 'PreuvCam : ${files.length} segment(s)',
-    ));
+    await SharePlus.instance.share(
+      ShareParams(
+        files: files,
+        subject: 'PreuvCam : ${files.length} segment(s)',
+      ),
+    );
   }
 
   /// Date et heure locales du téléphone, au format jj/mm à hh:mm.
@@ -348,18 +390,23 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
                 color: Colors.black,
                 child: camera == null
                     ? Center(
-                        child: Text(_status,
-                            style: const TextStyle(color: Colors.white70)))
-                    : Stack(children: [
-                        Center(child: CameraPreview(camera)),
-                        if (recorder != null)
-                          Positioned.fill(
-                            child: ValueListenableBuilder<RecorderState>(
-                              valueListenable: recorder.state,
-                              builder: (context, s, _) => _Overlay(state: s),
+                        child: Text(
+                          _status,
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                      )
+                    : Stack(
+                        children: [
+                          Center(child: CameraPreview(camera)),
+                          if (recorder != null)
+                            Positioned.fill(
+                              child: ValueListenableBuilder<RecorderState>(
+                                valueListenable: recorder.state,
+                                builder: (context, s, _) => _Overlay(state: s),
+                              ),
                             ),
-                          ),
-                      ]),
+                        ],
+                      ),
               ),
             ),
             SizedBox(
@@ -402,8 +449,9 @@ class _Panel extends StatelessWidget {
   final VoidCallback? onSignOut;
   final VoidCallback? onExport;
 
-  static String _seconds(Duration? d) =>
-      d == null ? '…' : '${(d.inMilliseconds / 1000).toStringAsFixed(1).replaceAll('.', ',')} s';
+  static String _seconds(Duration? d) => d == null
+      ? '…'
+      : '${(d.inMilliseconds / 1000).toStringAsFixed(1).replaceAll('.', ',')} s';
 
   @override
   Widget build(BuildContext context) {
@@ -423,24 +471,38 @@ class _Panel extends StatelessWidget {
         children: [
           const _Brand(),
           const SizedBox(height: 12),
-          Row(children: [
-            Expanded(
-              child: state.offline
-                  ? const _Pill(label: 'Réseau', value: 'Hors ligne', icon: Icons.wifi_off,
-                      bg: Palette.warnBg, fg: Palette.warnFg)
-                  : const _Pill(label: 'Réseau', value: 'En ligne', icon: Icons.check,
-                      bg: Palette.okBg, fg: Palette.okFg),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _Pill(
-                label: 'À envoyer',
-                value: pending > 1 ? '$pending empreintes' : '$pending empreinte',
-                bg: Palette.neutralBg,
-                fg: Palette.ink,
+          Row(
+            children: [
+              Expanded(
+                child: state.offline
+                    ? const _Pill(
+                        label: 'Réseau',
+                        value: 'Hors ligne',
+                        icon: Icons.wifi_off,
+                        bg: Palette.warnBg,
+                        fg: Palette.warnFg,
+                      )
+                    : const _Pill(
+                        label: 'Réseau',
+                        value: 'En ligne',
+                        icon: Icons.check,
+                        bg: Palette.okBg,
+                        fg: Palette.okFg,
+                      ),
               ),
-            ),
-          ]),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _Pill(
+                  label: 'À envoyer',
+                  value: pending > 1
+                      ? '$pending empreintes'
+                      : '$pending empreinte',
+                  bg: Palette.neutralBg,
+                  fg: Palette.ink,
+                ),
+              ),
+            ],
+          ),
           if (state.offline && state.recording) ...[
             const SizedBox(height: 8),
             const Text(
@@ -456,8 +518,10 @@ class _Panel extends StatelessWidget {
                 color: Palette.errorBg,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Text(state.error!,
-                  style: const TextStyle(fontSize: 13, color: Palette.errorFg)),
+              child: Text(
+                state.error!,
+                style: const TextStyle(fontSize: 13, color: Palette.errorFg),
+              ),
             ),
           ],
           const SizedBox(height: 12),
@@ -467,8 +531,13 @@ class _Panel extends StatelessWidget {
               backgroundColor: Palette.amber,
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(56),
-              textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              textStyle: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
             icon: const Icon(Icons.shield_outlined),
             label: const Text('Protéger un incident'),
@@ -480,24 +549,41 @@ class _Panel extends StatelessWidget {
               backgroundColor: state.recording ? Palette.ink : Palette.teal,
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(48),
-              textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
-            icon: Icon(state.recording ? Icons.stop : Icons.fiber_manual_record),
-            label: Text(state.recording ? 'Arrêter l\'enregistrement' : 'Démarrer'),
+            icon: Icon(
+              state.recording ? Icons.stop : Icons.fiber_manual_record,
+            ),
+            label: Text(
+              state.recording ? 'Arrêter l\'enregistrement' : 'Démarrer',
+            ),
           ),
           const SizedBox(height: 10),
-          Row(children: [
-            Expanded(
-              child: OutlinedButton(
-                  onPressed: onExport, style: outlined, child: const Text('Exporter')),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton(
-                  onPressed: onSignOut, style: outlined, child: const Text('Déconnexion')),
-            ),
-          ]),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onExport,
+                  style: outlined,
+                  child: const Text('Exporter'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onSignOut,
+                  style: outlined,
+                  child: const Text('Déconnexion'),
+                ),
+              ),
+            ],
+          ),
           if (state.lastGap != null || state.lastHashTime != null) ...[
             const SizedBox(height: 12),
             Text(
@@ -518,20 +604,28 @@ class _Brand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
-      Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          color: Palette.teal,
-          borderRadius: BorderRadius.circular(7),
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: Palette.teal,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: const Icon(Icons.shield, size: 18, color: Colors.white),
         ),
-        child: const Icon(Icons.shield, size: 18, color: Colors.white),
-      ),
-      const SizedBox(width: 8),
-      const Text('PreuvCam',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Palette.ink)),
-    ]);
+        const SizedBox(width: 8),
+        const Text(
+          'PreuvCam',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: Palette.ink,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -555,22 +649,33 @@ class _Pill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: TextStyle(fontSize: 11, color: fg)),
-          Row(children: [
-            if (icon != null) ...[
-              Icon(icon, size: 14, color: fg),
-              const SizedBox(width: 4),
-            ],
-            Flexible(
-              child: Text(value,
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 14, color: fg),
+                const SizedBox(width: 4),
+              ],
+              Flexible(
+                child: Text(
+                  value,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: fg)),
-            ),
-          ]),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: fg,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -590,38 +695,54 @@ class _Overlay extends StatelessWidget {
     const digits = TextStyle(fontFeatures: [FontFeature.tabularFigures()]);
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Column(children: [
-        Row(children: [
-          if (state.recording && since != null)
-            _Tag(children: [
-              const Icon(Icons.circle, size: 10, color: Palette.rec),
-              const SizedBox(width: 8),
-              _EverySecond(builder: (now) {
-                final d = now.difference(since);
-                return Text(
-                  'REC ${_two(d.inHours)}:${_two(d.inMinutes % 60)}:${_two(d.inSeconds % 60)}',
-                  style: digits.copyWith(fontWeight: FontWeight.w700),
-                );
-              }),
-            ]),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              if (state.recording && since != null)
+                _Tag(
+                  children: [
+                    const Icon(Icons.circle, size: 10, color: Palette.rec),
+                    const SizedBox(width: 8),
+                    _EverySecond(
+                      builder: (now) {
+                        final d = now.difference(since);
+                        return Text(
+                          'REC ${_two(d.inHours)}:${_two(d.inMinutes % 60)}:${_two(d.inSeconds % 60)}',
+                          style: digits.copyWith(fontWeight: FontWeight.w700),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              const Spacer(),
+              if (seq != null)
+                _Tag(
+                  children: [
+                    const Icon(
+                      Icons.shield_outlined,
+                      size: 14,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 6),
+                    Text('Segment n° $seq'),
+                  ],
+                ),
+            ],
+          ),
           const Spacer(),
-          if (seq != null)
-            _Tag(children: [
-              const Icon(Icons.shield_outlined, size: 14, color: Colors.white),
-              const SizedBox(width: 6),
-              Text('Segment n° $seq'),
-            ]),
-        ]),
-        const Spacer(),
-        Align(
-          alignment: Alignment.bottomLeft,
-          child: _EverySecond(builder: (now) => Text(
+          Align(
+            alignment: Alignment.bottomLeft,
+            child: _EverySecond(
+              builder: (now) => Text(
                 '${_two(now.day)}/${_two(now.month)} · '
                 '${_two(now.hour)}:${_two(now.minute)}:${_two(now.second)}',
                 style: digits.copyWith(color: Colors.white70, fontSize: 12),
-              )),
-        ),
-      ]),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -648,7 +769,7 @@ class _Tag extends StatelessWidget {
   }
 }
 
-/// Se redessine chaque seconde : pour le compteur et l'horloge.
+/// Se redessine chaque seconde pour actualiser le compteur et l'horloge.
 class _EverySecond extends StatefulWidget {
   const _EverySecond({required this.builder});
 
@@ -664,7 +785,10 @@ class _EverySecondState extends State<_EverySecond> {
   @override
   void initState() {
     super.initState();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    _ticker = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => setState(() {}),
+    );
   }
 
   @override

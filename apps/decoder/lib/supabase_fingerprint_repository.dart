@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'fingerprint_repository.dart';
 
-/// Lit et gèle les empreintes dans Supabase. Les règles RLS limitent
+/// Lit et gèle les empreintes dans Supabase. Les politiques RLS limitent
 /// automatiquement les résultats à la compagnie de l'agent connecté.
 class SupabaseFingerprintRepository implements FingerprintRepository {
   SupabaseFingerprintRepository(this._client);
@@ -27,7 +27,10 @@ class SupabaseFingerprintRepository implements FingerprintRepository {
   }
 
   @override
-  Future<int> freeze({required String deviceId, required List<int> seqs}) async {
+  Future<int> freeze({
+    required String deviceId,
+    required List<int> seqs,
+  }) async {
     final updated = await _client
         .from('fingerprints')
         .update({'frozen': true})

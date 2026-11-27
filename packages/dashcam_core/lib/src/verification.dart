@@ -4,7 +4,7 @@ import 'stored_fingerprint.dart';
 /// Verdict rendu pour un fichier fourni.
 enum Verdict { authentic, modified, unknown, inconsistent }
 
-/// Alertes qui s'ajoutent au verdict sans le changer.
+/// Alertes qui complètent le verdict sans le modifier.
 enum Alert { lateDelivery, missingPrevious }
 
 /// Fichier remis par le conducteur, avec le hash recalculé par le décodeur.
@@ -34,14 +34,14 @@ class SegmentResult {
   final String reason;
 
   /// Période filmée, d'après l'empreinte enregistrée.
-  /// Vide quand aucune empreinte n'a été trouvée pour ce fichier.
+  /// Vaut `null` lorsqu'aucune empreinte n'a été trouvée pour ce fichier.
   final DateTime? startedAt;
   final DateTime? endedAt;
 }
 
 /// Vérifie les fichiers fournis par rapport aux empreintes enregistrées.
 ///
-/// Fonction pure : aucun accès réseau ni fichier. Les résultats sont
+/// Fonction pure, sans accès au réseau ni aux fichiers. Les résultats sont
 /// renvoyés dans l'ordre des fichiers fournis.
 List<SegmentResult> verifySegments({
   required List<ProvidedSegment> provided,
@@ -55,13 +55,13 @@ List<SegmentResult> verifySegments({
     (storedIndex[s.deviceId] ??= {})[s.seq] = s;
   }
 
-  // 2. Délai médian de chaque appareil : son décalage habituel.
+  // 2. Délai médian de chaque appareil, qui représente son décalage habituel.
   final medianDelay = {
     for (final entry in storedIndex.entries)
       entry.key: _median(entry.value.values.map((s) => s.deliveryDelay)),
   };
 
-  // 3. Fichiers fournis : noms lus une fois, hashs rangés par appareil.
+  // 3. Fichiers fournis : noms analysés une seule fois, hashs rangés par appareil.
   final names = [for (final p in provided) SegmentName.tryParse(p.fileName)];
   final providedHashes = <String, Map<int, String>>{};
   for (var i = 0; i < provided.length; i++) {
@@ -140,12 +140,20 @@ SegmentResult _verifyOne({
     );
   }
 
-  // Alertes : elles ne changent pas le verdict.
+  // Alertes : elles ne modifient pas le verdict.
   final alerts = <Alert>{};
+  // Seuil de retard : le délai habituel de ce téléphone (sa médiane, qui
+  // absorbe un réseau lent ou une horloge décalée) plus deux segments.
+  // Une coupure courte, de l'ordre de deux segments, ne déclenche donc pas
+  // d'alerte ; une empreinte arrivée bien au-delà est signalée.
   if (record.deliveryDelay > medianDelay[name.deviceId]! + segmentDuration * 2) {
     alerts.add(Alert.lateDelivery);
   }
   final deviceProvided = providedHashes[name.deviceId]!;
+  // Le premier fichier fourni pour un appareil n'a pas de précédent parmi
+  // les fichiers remis : l'assureur ne reçoit qu'un extrait (la période de
+  // l'incident). Son absence n'est pas un trou ; seul un manque à
+  // l'intérieur de la série fournie déclenche l'alerte missingPrevious.
   final isFirstOfSeries = !deviceProvided.keys.any((seq) => seq < name.seq);
   if (!deviceProvided.containsKey(name.seq - 1) && !isFirstOfSeries) {
     alerts.add(Alert.missingPrevious);
@@ -172,7 +180,7 @@ SegmentResult _verifyOne({
       problems.add('le fichier précédent ne correspond pas au hash précédent enregistré');
     }
   } else if (prevStored != null && record.prevHash != prevStored.segmentHash) {
-    // Sans le fichier précédent : la chaîne stockée doit rester cohérente.
+    // Sans le fichier précédent, la chaîne enregistrée doit rester cohérente.
     problems.add('les empreintes enregistrées ne sont pas chaînées entre elles');
   }
 

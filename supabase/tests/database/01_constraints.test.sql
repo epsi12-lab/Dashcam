@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(9);
 
--- Données de départ
+-- Données initiales
 insert into public.insurers (id, name) values ('a0000000-0000-0000-0000-000000000000', 'Compagnie A');
 insert into auth.users (id, email) values
   ('d1000000-0000-0000-0000-000000000000', 'conducteur1@a.fr'),

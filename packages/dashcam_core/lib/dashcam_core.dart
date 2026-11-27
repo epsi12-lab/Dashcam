@@ -1,4 +1,5 @@
-/// Logique commune aux applications Dashcam : empreintes et noms de segments.
+/// Logique commune aux applications Dashcam : empreintes, noms de segments,
+/// calcul des hashs et vérification.
 library;
 
 export 'src/fingerprint.dart';

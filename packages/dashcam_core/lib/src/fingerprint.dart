@@ -2,8 +2,8 @@ import 'patterns.dart';
 
 /// Empreinte d'un segment vidéo, telle qu'envoyée par l'encodeur.
 ///
-/// Les règles sont les mêmes que celles de la table `fingerprints` :
-/// une erreur est détectée ici, avant tout envoi.
+/// Les règles de validation reprennent celles de la table `fingerprints` :
+/// une donnée invalide est ainsi détectée ici, avant tout envoi.
 class Fingerprint {
   Fingerprint({
     required this.deviceId,
@@ -50,7 +50,8 @@ class Fingerprint {
         endedAt: endedAt,
       );
 
-  /// Relit une empreinte depuis le format d'envoi (file d'attente locale).
+  /// Reconstruit une empreinte à partir du format d'envoi, utilisé par la file
+  /// d'attente locale.
   factory Fingerprint.fromInsertJson(Map<String, Object?> json) => Fingerprint(
         deviceId: json['device_id'] as String,
         seq: json['seq'] as int,
@@ -67,7 +68,8 @@ class Fingerprint {
   final DateTime startedAt;
   final DateTime endedAt;
 
-  /// Segment suivant de la chaîne : numéro suivant, chaîné à celui-ci.
+  /// Segment suivant de la chaîne : numéro incrémenté, hash précédent égal au
+  /// hash de ce segment.
   Fingerprint next({
     required String segmentHash,
     required DateTime startedAt,
@@ -82,8 +84,8 @@ class Fingerprint {
         endedAt: endedAt,
       );
 
-  /// Format d'envoi à Supabase : uniquement les six colonnes autorisées,
-  /// heures en UTC.
+  /// Format d'envoi à Supabase : uniquement les six colonnes autorisées, avec
+  /// des heures exprimées en UTC.
   Map<String, Object?> toInsertJson() => {
         'device_id': deviceId,
         'seq': seq,

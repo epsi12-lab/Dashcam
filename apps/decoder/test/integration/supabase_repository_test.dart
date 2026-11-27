@@ -51,7 +51,11 @@ void main() {
       final stop = start.add(const Duration(seconds: 10));
       fp = fp == null
           ? Fingerprint.first(
-              deviceId: deviceId, segmentHash: hash, startedAt: start, endedAt: stop)
+              deviceId: deviceId,
+              segmentHash: hash,
+              startedAt: start,
+              endedAt: stop,
+            )
           : fp.next(segmentHash: hash, startedAt: start, endedAt: stop);
       await driver.from('fingerprints').insert(fp.toInsertJson());
     }
@@ -63,57 +67,75 @@ void main() {
     await agentBeta.dispose();
   });
 
-  test('ENF-09 : l\'agent de la compagnie lit les empreintes, dans l\'ordre', () async {
-    final rows = await SupabaseFingerprintRepository(agentAlpha)
-        .fetchRange(deviceId: deviceId, fromSeq: 1, toSeq: 3);
+  test(
+    'ENF-09 : l\'agent de la compagnie lit les empreintes, dans l\'ordre',
+    () async {
+      final rows = await SupabaseFingerprintRepository(
+        agentAlpha,
+      ).fetchRange(deviceId: deviceId, fromSeq: 1, toSeq: 3);
 
-    expect(rows.map((r) => r.seq), [1, 2, 3]);
-    expect(rows.first.prevHash, isNull);
-  });
+      expect(rows.map((r) => r.seq), [1, 2, 3]);
+      expect(rows.first.prevHash, isNull);
+    },
+  );
 
   test('seule la plage demandée est renvoyée', () async {
-    final rows = await SupabaseFingerprintRepository(agentAlpha)
-        .fetchRange(deviceId: deviceId, fromSeq: 2, toSeq: 3);
+    final rows = await SupabaseFingerprintRepository(
+      agentAlpha,
+    ).fetchRange(deviceId: deviceId, fromSeq: 2, toSeq: 3);
 
     expect(rows.map((r) => r.seq), [2, 3]);
   });
 
   test('TA-08 : l\'agent d\'une autre compagnie ne voit rien', () async {
-    final rows = await SupabaseFingerprintRepository(agentBeta)
-        .fetchRange(deviceId: deviceId, fromSeq: 1, toSeq: 3);
+    final rows = await SupabaseFingerprintRepository(
+      agentBeta,
+    ).fetchRange(deviceId: deviceId, fromSeq: 1, toSeq: 3);
 
     expect(rows, isEmpty);
   });
 
   test('TI-07 : l\'agent d\'une autre compagnie ne peut rien geler', () async {
-    final frozen = await SupabaseFingerprintRepository(agentBeta)
-        .freeze(deviceId: deviceId, seqs: [1, 2, 3]);
+    final frozen = await SupabaseFingerprintRepository(
+      agentBeta,
+    ).freeze(deviceId: deviceId, seqs: [1, 2, 3]);
 
     expect(frozen, 0);
   });
 
-  test('EF-D07 : l\'agent de la compagnie gèle les empreintes demandées', () async {
-    final repo = SupabaseFingerprintRepository(agentAlpha);
+  test(
+    'EF-D07 : l\'agent de la compagnie gèle les empreintes demandées',
+    () async {
+      final repo = SupabaseFingerprintRepository(agentAlpha);
 
-    final frozen = await repo.freeze(deviceId: deviceId, seqs: [1, 2]);
-    final rows = await repo.fetchRange(deviceId: deviceId, fromSeq: 1, toSeq: 3);
+      final frozen = await repo.freeze(deviceId: deviceId, seqs: [1, 2]);
+      final rows = await repo.fetchRange(
+        deviceId: deviceId,
+        fromSeq: 1,
+        toSeq: 3,
+      );
 
-    expect(frozen, 2);
-    expect(rows.map((r) => r.frozen), [true, true, false]);
-  });
+      expect(frozen, 2);
+      expect(rows.map((r) => r.frozen), [true, true, false]);
+    },
+  );
 
-  test('de bout en bout : les fichiers intacts sont déclarés authentiques', () async {
-    final service =
-        VerificationService(repository: SupabaseFingerprintRepository(agentAlpha));
+  test(
+    'de bout en bout : les fichiers intacts sont déclarés authentiques',
+    () async {
+      final service = VerificationService(
+        repository: SupabaseFingerprintRepository(agentAlpha),
+      );
 
-    final results = await service.verify([
-      for (var i = 0; i < contents.length; i++)
-        PickedSegment(
-          fileName: SegmentName(deviceId: deviceId, seq: i + 1).fileName,
-          content: bytes(contents[i]),
-        ),
-    ]);
+      final results = await service.verify([
+        for (var i = 0; i < contents.length; i++)
+          PickedSegment(
+            fileName: SegmentName(deviceId: deviceId, seq: i + 1).fileName,
+            content: bytes(contents[i]),
+          ),
+      ]);
 
-    expect(results.map((r) => r.verdict), everyElement(Verdict.authentic));
-  });
+      expect(results.map((r) => r.verdict), everyElement(Verdict.authentic));
+    },
+  );
 }

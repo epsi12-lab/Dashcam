@@ -7,11 +7,14 @@ import 'fingerprint_sender.dart';
 
 /// Envoie les empreintes à la table `fingerprints` de Supabase.
 class SupabaseFingerprintSender implements FingerprintSender {
-  SupabaseFingerprintSender(this._client, {this.timeout = const Duration(seconds: 15)});
+  SupabaseFingerprintSender(
+    this._client, {
+    this.timeout = const Duration(seconds: 15),
+  });
 
   final SupabaseClient _client;
 
-  /// Délai au-delà duquel on considère que le serveur ne répond pas.
+  /// Délai au-delà duquel le serveur est considéré comme ne répondant pas.
   final Duration timeout;
 
   /// Familles d'erreurs SQL définitives : données invalides (22),
@@ -21,7 +24,10 @@ class SupabaseFingerprintSender implements FingerprintSender {
   @override
   Future<SendResult> send(Fingerprint fp) async {
     try {
-      await _client.from('fingerprints').insert(fp.toInsertJson()).timeout(timeout);
+      await _client
+          .from('fingerprints')
+          .insert(fp.toInsertJson())
+          .timeout(timeout);
       return const SendResult(SendStatus.stored);
     } on PostgrestException catch (e) {
       final code = e.code;
@@ -33,7 +39,8 @@ class SupabaseFingerprintSender implements FingerprintSender {
       }
       return SendResult(SendStatus.networkError, e.message);
     } on Exception catch (e) {
-      // Serveur injoignable, délai dépassé, réponse illisible : on réessaiera.
+      // Serveur injoignable, délai dépassé ou réponse illisible : l'envoi sera
+      // retenté.
       return SendResult(SendStatus.networkError, '$e');
     }
   }

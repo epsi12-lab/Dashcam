@@ -9,7 +9,7 @@ insert into public.profiles (id, role, insurer_id)
 insert into public.devices (id, owner_id)
   values ('e1000000-0000-0000-0000-000000000000', 'd1000000-0000-0000-0000-000000000000');
 
--- Segment 1 : expiré ; segment 2 : expiré mais gelé ; segment 3 : récent
+-- Segment 1 : expiré ; segment 2 : expiré mais gelé ; segment 3 : récent.
 insert into public.fingerprints (device_id, seq, segment_hash, prev_hash, started_at, ended_at, received_at, frozen) values
   ('e1000000-0000-0000-0000-000000000000', 1,
    '1111111111111111111111111111111111111111111111111111111111111111', null,

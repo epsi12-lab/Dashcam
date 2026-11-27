@@ -23,5 +23,5 @@ abstract final class Palette {
   static const panel = Color(0xFFF7FAF9);
 }
 
-/// Largeur en dessous de laquelle on passe en mise en page compacte.
+/// Largeur en dessous de laquelle la mise en page devient compacte.
 const compactWidth = 960.0;

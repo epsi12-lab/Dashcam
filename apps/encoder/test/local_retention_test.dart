@@ -20,20 +20,22 @@ class Env {
   DateTime current = t0;
   Fingerprint? _last;
 
-  static Future<Env> create() async => Env._(await LocalStore.open(
-        await databaseFactoryFfi.openDatabase(
-          inMemoryDatabasePath,
-          options: OpenDatabaseOptions(singleInstance: false),
-        ),
-      ));
+  static Future<Env> create() async => Env._(
+    await LocalStore.open(
+      await databaseFactoryFfi.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(singleInstance: false),
+      ),
+    ),
+  );
 
   LocalRetention retention({int? maxBytes}) => LocalRetention(
-        store: store,
-        deleteFile: (name) async => deleted.add(name),
-        now: () => current,
-        maxBytes: maxBytes,
-        sizeOf: (name) async => 100,
-      );
+    store: store,
+    deleteFile: (name) async => deleted.add(name),
+    now: () => current,
+    maxBytes: maxBytes,
+    sizeOf: (name) async => 100,
+  );
 
   /// Enregistre les segments suivants : le n-ième couvre [t0 + (n-1)·D, t0 + n·D].
   Future<void> recordSegments(int count) async {
@@ -44,8 +46,16 @@ class Env {
       final last = _last;
       _last = last == null
           ? Fingerprint.first(
-              deviceId: deviceId, segmentHash: hash, startedAt: start, endedAt: start.add(d))
-          : last.next(segmentHash: hash, startedAt: start, endedAt: start.add(d));
+              deviceId: deviceId,
+              segmentHash: hash,
+              startedAt: start,
+              endedAt: start.add(d),
+            )
+          : last.next(
+              segmentHash: hash,
+              startedAt: start,
+              endedAt: start.add(d),
+            );
       await store.recordSegment(_last!);
     }
   }
@@ -64,15 +74,18 @@ void main() {
       expect(env.deleted, isEmpty);
     });
 
-    test('les segments de plus de 24 h sont supprimés, fichier et ligne', () async {
-      final env = await Env.create();
-      await env.recordSegments(3);
-      env.current = t0.add(const Duration(hours: 25));
+    test(
+      'les segments de plus de 24 h sont supprimés, fichier et ligne',
+      () async {
+        final env = await Env.create();
+        await env.recordSegments(3);
+        env.current = t0.add(const Duration(hours: 25));
 
-      expect(await env.retention().run(), 3);
-      expect(env.deleted, [fileOf(1), fileOf(2), fileOf(3)]);
-      expect(await env.store.segmentFileNames(), isEmpty);
-    });
+        expect(await env.retention().run(), 3);
+        expect(env.deleted, [fileOf(1), fileOf(2), fileOf(3)]);
+        expect(await env.store.segmentFileNames(), isEmpty);
+      },
+    );
 
     test('seuls les segments expirés sont supprimés', () async {
       final env = await Env.create();
@@ -85,15 +98,18 @@ void main() {
       expect(await env.store.segmentFileNames(), [fileOf(2)]);
     });
 
-    test('la purge ne touche pas à la file d\'attente des empreintes', () async {
-      final env = await Env.create();
-      await env.recordSegments(3);
-      env.current = t0.add(const Duration(hours: 25));
+    test(
+      'la purge ne touche pas à la file d\'attente des empreintes',
+      () async {
+        final env = await Env.create();
+        await env.recordSegments(3);
+        env.current = t0.add(const Duration(hours: 25));
 
-      await env.retention().run();
+        await env.retention().run();
 
-      expect(await env.store.pendingCount(), 3);
-    });
+        expect(await env.store.pendingCount(), 3);
+      },
+    );
 
     test('un second passage ne supprime rien de plus', () async {
       final env = await Env.create();
@@ -108,19 +124,24 @@ void main() {
   });
 
   group('EF-E10 : protection d\'un incident', () {
-    test('les segments de la minute précédant l\'incident sont protégés', () async {
-      final env = await Env.create();
-      await env.recordSegments(10); // couvrent t0 à t0 + 100 s
+    test(
+      'les segments de la minute précédant l\'incident sont protégés',
+      () async {
+        final env = await Env.create();
+        await env.recordSegments(10); // couvrent t0 à t0 + 100 s
 
-      // Incident à t0 + 70 s : fenêtre protégée [t0 + 10 s, t0 + 100 s].
-      await env.retention().protectIncident(t0.add(const Duration(seconds: 70)));
-      env.current = t0.add(const Duration(hours: 25));
-      await env.retention().run();
+        // Incident à t0 + 70 s : fenêtre protégée [t0 + 10 s, t0 + 100 s].
+        await env.retention().protectIncident(
+          t0.add(const Duration(seconds: 70)),
+        );
+        env.current = t0.add(const Duration(hours: 25));
+        await env.retention().run();
 
-      // Le segment 1 [t0, t0 + 10 s] touche la fenêtre sans la chevaucher.
-      expect(env.deleted, [fileOf(1)]);
-      expect(await env.store.segmentFileNames(), hasLength(9));
-    });
+        // Le segment 1 [t0, t0 + 10 s] touche la fenêtre sans la chevaucher.
+        expect(env.deleted, [fileOf(1)]);
+        expect(await env.store.segmentFileNames(), hasLength(9));
+      },
+    );
 
     test('les segments enregistrés après l\'appui sont aussi protégés', () async {
       final env = await Env.create();
@@ -146,31 +167,37 @@ void main() {
       expect(env.deleted, isEmpty);
     });
 
-    test('au-delà du quota, les plus anciens partent jusqu\'à repasser dessous',
-        () async {
-      final env = await Env.create();
-      await env.recordSegments(5); // 500 octets
-      env.current = t0.add(const Duration(hours: 1));
+    test(
+      'au-delà du quota, les plus anciens partent jusqu\'à repasser dessous',
+      () async {
+        final env = await Env.create();
+        await env.recordSegments(5); // 500 octets
+        env.current = t0.add(const Duration(hours: 1));
 
-      await env.retention(maxBytes: 350).run();
+        await env.retention(maxBytes: 350).run();
 
-      expect(env.deleted, [fileOf(1), fileOf(2)]); // il reste 300 octets
-    });
+        expect(env.deleted, [fileOf(1), fileOf(2)]); // il reste 300 octets
+      },
+    );
 
-    test('un segment protégé n\'est jamais supprimé pour faire de la place',
-        () async {
-      final env = await Env.create();
-      await env.recordSegments(10); // 1000 octets, de t0 à t0 + 100 s
-      // Incident à t0 + 25 s : fenêtre [t0 − 35 s, t0 + 55 s], segments 1 à 6.
-      await env.retention().protectIncident(t0.add(const Duration(seconds: 25)));
-      env.current = t0.add(const Duration(hours: 1));
+    test(
+      'un segment protégé n\'est jamais supprimé pour faire de la place',
+      () async {
+        final env = await Env.create();
+        await env.recordSegments(10); // 1000 octets, de t0 à t0 + 100 s
+        // Incident à t0 + 25 s : fenêtre [t0 − 35 s, t0 + 55 s], segments 1 à 6.
+        await env.retention().protectIncident(
+          t0.add(const Duration(seconds: 25)),
+        );
+        env.current = t0.add(const Duration(hours: 1));
 
-      await env.retention(maxBytes: 350).run();
+        await env.retention(maxBytes: 350).run();
 
-      // Seuls 7 à 10 sont supprimables : il reste 600 octets, au-dessus du
-      // quota, mais les segments protégés sont conservés.
-      expect(env.deleted, [fileOf(7), fileOf(8), fileOf(9), fileOf(10)]);
-    });
+        // Seuls 7 à 10 sont supprimables : il reste 600 octets, au-dessus du
+        // quota, mais les segments protégés sont conservés.
+        expect(env.deleted, [fileOf(7), fileOf(8), fileOf(9), fileOf(10)]);
+      },
+    );
 
     test('la durée et le quota s\'appliquent l\'un après l\'autre', () async {
       final env = await Env.create();

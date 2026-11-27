@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 
 const _key = 'device_id';
 
-/// Identifiant du téléphone : généré au premier lancement, puis conservé.
+/// Identifiant du téléphone, généré au premier lancement puis conservé.
 Future<String> loadOrCreateDeviceId(SharedPreferences prefs) async {
   final existing = prefs.getString(_key);
   if (existing != null) return existing;

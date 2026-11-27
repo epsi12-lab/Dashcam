@@ -13,35 +13,51 @@ const d = Duration(seconds: 10);
 Stream<List<int>> content(String text) => Stream.value(utf8.encode(text));
 
 Future<LocalStore> memoryStore() async => LocalStore.open(
-      await databaseFactoryFfi.openDatabase(
-        inMemoryDatabasePath,
-        options: OpenDatabaseOptions(singleInstance: false),
-      ),
-    );
+  await databaseFactoryFfi.openDatabase(
+    inMemoryDatabasePath,
+    options: OpenDatabaseOptions(singleInstance: false),
+  ),
+);
 
 void main() {
   setUpAll(sqfliteFfiInit);
 
-  test('le premier segment reçoit le numéro 1 et le hash de son contenu', () async {
-    final processor =
-        SegmentProcessor(store: await memoryStore(), deviceId: deviceId);
+  test(
+    'le premier segment reçoit le numéro 1 et le hash de son contenu',
+    () async {
+      final processor = SegmentProcessor(
+        store: await memoryStore(),
+        deviceId: deviceId,
+      );
 
-    final fp = await processor.process(
-        content: content('segment 1'), startedAt: t0, endedAt: t0.add(d));
+      final fp = await processor.process(
+        content: content('segment 1'),
+        startedAt: t0,
+        endedAt: t0.add(d),
+      );
 
-    expect(fp.seq, 1);
-    expect(fp.prevHash, isNull);
-    expect(fp.segmentHash, await sha256OfStream(content('segment 1')));
-  });
+      expect(fp.seq, 1);
+      expect(fp.prevHash, isNull);
+      expect(fp.segmentHash, await sha256OfStream(content('segment 1')));
+    },
+  );
 
   test('le segment suivant est chaîné au précédent', () async {
-    final processor =
-        SegmentProcessor(store: await memoryStore(), deviceId: deviceId);
+    final processor = SegmentProcessor(
+      store: await memoryStore(),
+      deviceId: deviceId,
+    );
 
     final fp1 = await processor.process(
-        content: content('segment 1'), startedAt: t0, endedAt: t0.add(d));
+      content: content('segment 1'),
+      startedAt: t0,
+      endedAt: t0.add(d),
+    );
     final fp2 = await processor.process(
-        content: content('segment 2'), startedAt: t0.add(d), endedAt: t0.add(d * 2));
+      content: content('segment 2'),
+      startedAt: t0.add(d),
+      endedAt: t0.add(d * 2),
+    );
 
     expect(fp2.seq, 2);
     expect(fp2.prevHash, fp1.segmentHash);
@@ -52,25 +68,40 @@ void main() {
     final processor = SegmentProcessor(store: store, deviceId: deviceId);
 
     await processor.process(
-        content: content('segment 1'), startedAt: t0, endedAt: t0.add(d));
+      content: content('segment 1'),
+      startedAt: t0,
+      endedAt: t0.add(d),
+    );
     await processor.process(
-        content: content('segment 2'), startedAt: t0.add(d), endedAt: t0.add(d * 2));
+      content: content('segment 2'),
+      startedAt: t0.add(d),
+      endedAt: t0.add(d * 2),
+    );
 
     expect(await store.pendingCount(), 2);
   });
 
-  test('après un redémarrage, la chaîne reprend là où elle s\'était arrêtée', () async {
-    final store = await memoryStore();
-    final before = SegmentProcessor(store: store, deviceId: deviceId);
-    final fp1 = await before.process(
-        content: content('segment 1'), startedAt: t0, endedAt: t0.add(d));
+  test(
+    'après un redémarrage, la chaîne reprend là où elle s\'était arrêtée',
+    () async {
+      final store = await memoryStore();
+      final before = SegmentProcessor(store: store, deviceId: deviceId);
+      final fp1 = await before.process(
+        content: content('segment 1'),
+        startedAt: t0,
+        endedAt: t0.add(d),
+      );
 
-    // Nouvelle instance, même stockage : comme après un redémarrage.
-    final after = SegmentProcessor(store: store, deviceId: deviceId);
-    final fp2 = await after.process(
-        content: content('segment 2'), startedAt: t0.add(d), endedAt: t0.add(d * 2));
+      // Nouvelle instance, même stockage : situation identique à un redémarrage.
+      final after = SegmentProcessor(store: store, deviceId: deviceId);
+      final fp2 = await after.process(
+        content: content('segment 2'),
+        startedAt: t0.add(d),
+        endedAt: t0.add(d * 2),
+      );
 
-    expect(fp2.seq, 2);
-    expect(fp2.prevHash, fp1.segmentHash);
-  });
+      expect(fp2.seq, 2);
+      expect(fp2.prevHash, fp1.segmentHash);
+    },
+  );
 }

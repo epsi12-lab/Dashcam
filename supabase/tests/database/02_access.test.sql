@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(16);
 
--- Données de départ : compagnies A et B, deux conducteurs et un agent chez A, un agent chez B
+-- Données initiales : compagnies A et B, deux conducteurs et un agent chez A, un agent chez B.
 insert into public.insurers (id, name) values
   ('a0000000-0000-0000-0000-000000000000', 'Compagnie A'),
   ('b0000000-0000-0000-0000-000000000000', 'Compagnie B');

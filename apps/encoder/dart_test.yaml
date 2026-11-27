@@ -1,4 +1,4 @@
 tags:
-  # Tests qui nécessitent Supabase local (supabase start).
+  # Test qui nécessite la pile locale : supabase start --network-id local-network
   integration:
     

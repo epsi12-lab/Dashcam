@@ -12,7 +12,7 @@ void main() {
     final second = await loadOrCreateDeviceId(prefs);
 
     expect(second, first);
-    // Accepté par SegmentName : uuid en minuscules.
+    // Accepté par `SegmentName` : UUID en minuscules.
     expect(() => SegmentName(deviceId: first, seq: 1), returnsNormally);
   });
 }

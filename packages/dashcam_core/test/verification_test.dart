@@ -6,10 +6,11 @@ const deviceB = '9b1d4e7a-2c3f-4a5b-8c6d-7e8f9a0b1c2d';
 const d = Duration(seconds: 10);
 final t0 = DateTime.utc(2026, 11, 9, 8);
 
-/// Hash fictif mais bien formé du segment n.
+/// Hash fictif mais bien formé du segment [n].
 String h(int n) => n.toRadixString(16).padLeft(64, '0');
 
-/// Empreinte telle qu'enregistrée en base pour le segment `seq`.
+/// Empreinte telle qu'enregistrée en base pour le segment [seq].
+///
 /// [delay] : délai réel entre la fin du segment et sa réception.
 /// [clockOffset] : décalage de l'horloge du téléphone.
 StoredFingerprint stored(
@@ -106,7 +107,7 @@ void main() {
 
     test('une altération de la base est détectée par la chaîne stockée', () {
       // L'empreinte 43 a été modifiée en base : elle ne correspond plus
-      // au prev_hash enregistré pour 44.
+      // au `prev_hash` enregistré pour le segment 44.
       final results = verifySegments(
         provided: [provided(deviceA, 44)],
         stored: [

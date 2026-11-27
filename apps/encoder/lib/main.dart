@@ -10,7 +10,8 @@ Future<void> main() async {
 
   if (AppConfig.supabaseKey.isEmpty) {
     throw StateError(
-        'Clé Supabase manquante : lancer avec --dart-define=SUPABASE_KEY=<clé publique>');
+      'Clé Supabase manquante : lancer avec --dart-define=SUPABASE_KEY=<clé publique>',
+    );
   }
 
   await Supabase.initialize(
@@ -31,8 +32,9 @@ class EncoderApp extends StatelessWidget {
       theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
       home: StreamBuilder<AuthState>(
         stream: auth.onAuthStateChange,
-        builder: (context, _) =>
-            auth.currentSession == null ? const LoginPage() : const RecorderPage(),
+        builder: (context, _) => auth.currentSession == null
+            ? const LoginPage()
+            : const RecorderPage(),
       ),
     );
   }

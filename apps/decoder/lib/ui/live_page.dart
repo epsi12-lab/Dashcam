@@ -13,7 +13,8 @@ class LivePage extends StatefulWidget {
   State<LivePage> createState() => _LivePageState();
 }
 
-class _LivePageState extends State<LivePage> with AutomaticKeepAliveClientMixin {
+class _LivePageState extends State<LivePage>
+    with AutomaticKeepAliveClientMixin {
   /// Flux créé une seule fois : chargement initial, puis mises à jour en direct.
   final _stream = Supabase.instance.client
       .from('fingerprints')
@@ -43,7 +44,10 @@ class _LivePageState extends State<LivePage> with AutomaticKeepAliveClientMixin 
             return ListView(
               padding: EdgeInsets.fromLTRB(pad, compact ? 18 : 28, pad, 40),
               children: [
-                _Intro(compact: compact, live: snapshot.hasData && !snapshot.hasError),
+                _Intro(
+                  compact: compact,
+                  live: snapshot.hasData && !snapshot.hasError,
+                ),
                 const SizedBox(height: 20),
                 if (snapshot.hasError)
                   _Message(
@@ -54,11 +58,15 @@ class _LivePageState extends State<LivePage> with AutomaticKeepAliveClientMixin 
                 else if (!snapshot.hasData)
                   const Padding(
                     padding: EdgeInsets.all(32),
-                    child: Center(child: CircularProgressIndicator(color: Palette.teal)),
+                    child: Center(
+                      child: CircularProgressIndicator(color: Palette.teal),
+                    ),
                   )
                 else if (fingerprints.isEmpty)
                   const _Message(
-                      icon: Icons.sensors, text: 'Aucune empreinte reçue pour l\'instant.')
+                    icon: Icons.sensors,
+                    text: 'Aucune empreinte reçue pour l\'instant.',
+                  )
                 else
                   for (final fp in fingerprints) ...[
                     _FingerprintCard(fp),
@@ -85,31 +93,46 @@ class _Intro extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          Expanded(
-            child: Text('Suivi en direct',
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Suivi en direct',
                 style: TextStyle(
-                    fontSize: compact ? 24 : 28,
-                    fontWeight: FontWeight.w700,
-                    color: Palette.ink)),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: live ? Palette.okBg : Palette.neutralBg,
-              borderRadius: BorderRadius.circular(999),
+                  fontSize: compact ? 24 : 28,
+                  fontWeight: FontWeight.w700,
+                  color: Palette.ink,
+                ),
+              ),
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.circle, size: 9, color: live ? Palette.okFg : Palette.muted),
-              const SizedBox(width: 6),
-              Text(live ? 'En direct' : 'Connexion…',
-                  style: TextStyle(
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: live ? Palette.okBg : Palette.neutralBg,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.circle,
+                    size: 9,
+                    color: live ? Palette.okFg : Palette.muted,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    live ? 'En direct' : 'Connexion…',
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: live ? Palette.okFg : Palette.muted)),
-            ]),
-          ),
-        ]),
+                      color: live ? Palette.okFg : Palette.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 6),
         const Text(
           'Les 30 dernières empreintes reçues des téléphones de la compagnie, '
@@ -136,8 +159,9 @@ class _FingerprintCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = SegmentName(deviceId: fp.deviceId, seq: fp.seq).fileName;
-    final delay =
-        (fp.deliveryDelay.inMilliseconds / 1000).toStringAsFixed(1).replaceAll('.', ',');
+    final delay = (fp.deliveryDelay.inMilliseconds / 1000)
+        .toStringAsFixed(1)
+        .replaceAll('.', ',');
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -145,52 +169,79 @@ class _FingerprintCard extends StatelessWidget {
         border: Border.all(color: Palette.border),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: Palette.tealLight,
-            borderRadius: BorderRadius.circular(10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Palette.tealLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              fp.frozen ? Icons.ac_unit : Icons.fingerprint,
+              color: Palette.teal,
+            ),
           ),
-          child: Icon(fp.frozen ? Icons.ac_unit : Icons.fingerprint, color: Palette.teal),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(shortSegmentName(name),
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w600, color: Palette.ink)),
-                if (fp.frozen)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Palette.neutralBg,
-                      borderRadius: BorderRadius.circular(999),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      shortSegmentName(name),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Palette.ink,
+                      ),
                     ),
-                    child: const Text('Gelée',
-                        style: TextStyle(fontSize: 12, color: Palette.neutralFg)),
+                    if (fp.frozen)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Palette.neutralBg,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          'Gelée',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Palette.neutralFg,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Filmé de ${_clock(fp.startedAt)} à ${_clock(fp.endedAt)} · '
+                  'reçu à ${_clock(fp.receivedAt)} (délai $delay s)',
+                  style: const TextStyle(fontSize: 13, color: Palette.body),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Empreinte ${fp.segmentHash.substring(0, 16)}…',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Palette.muted,
+                    fontFamily: 'monospace',
                   ),
+                ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Filmé de ${_clock(fp.startedAt)} à ${_clock(fp.endedAt)} · '
-              'reçu à ${_clock(fp.receivedAt)} (délai $delay s)',
-              style: const TextStyle(fontSize: 13, color: Palette.body),
-            ),
-            const SizedBox(height: 2),
-            Text('Empreinte ${fp.segmentHash.substring(0, 16)}…',
-                style: const TextStyle(
-                    fontSize: 12, color: Palette.muted, fontFamily: 'monospace')),
-          ]),
-        ),
-      ]),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -213,11 +264,15 @@ class _Message extends StatelessWidget {
         border: Border.all(color: error ? Palette.errorBg : Palette.border),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Row(children: [
-        Icon(icon, color: fg),
-        const SizedBox(width: 12),
-        Expanded(child: Text(text, style: TextStyle(color: fg))),
-      ]),
+      child: Row(
+        children: [
+          Icon(icon, color: fg),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(text, style: TextStyle(color: fg)),
+          ),
+        ],
+      ),
     );
   }
 }

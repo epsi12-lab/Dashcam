@@ -49,66 +49,84 @@ void main() {
     await driver2.dispose();
   });
 
-  test('TI-09 : un téléphone s\'enregistre, et un second enregistrement est sans effet',
-      () async {
-    final deviceId = const Uuid().v4();
+  test(
+    'TI-09 : un téléphone s\'enregistre, et un second enregistrement est sans effet',
+    () async {
+      final deviceId = const Uuid().v4();
 
-    await registerDevice(driver1, deviceId);
-    await registerDevice(driver1, deviceId); // comme à chaque démarrage
+      await registerDevice(driver1, deviceId);
+      await registerDevice(driver1, deviceId); // comme à chaque démarrage
 
-    final rows = await driver1.from('devices').select().eq('id', deviceId);
-    expect(rows, hasLength(1));
-  });
+      final rows = await driver1.from('devices').select().eq('id', deviceId);
+      expect(rows, hasLength(1));
+    },
+  );
 
-  test('TI-09 : une empreinte envoyée est enregistrée, avec l\'heure du serveur',
-      () async {
-    final deviceId = const Uuid().v4();
-    await registerDevice(driver1, deviceId);
-    final fp = firstOf(deviceId);
+  test(
+    'TI-09 : une empreinte envoyée est enregistrée, avec l\'heure du serveur',
+    () async {
+      final deviceId = const Uuid().v4();
+      await registerDevice(driver1, deviceId);
+      final fp = firstOf(deviceId);
 
-    final result = await SupabaseFingerprintSender(driver1).send(fp);
-    expect(result.status, SendStatus.stored);
+      final result = await SupabaseFingerprintSender(driver1).send(fp);
+      expect(result.status, SendStatus.stored);
 
-    final row = await driver1
-        .from('fingerprints')
-        .select()
-        .eq('device_id', deviceId)
-        .eq('seq', 1)
-        .single();
-    final stored = StoredFingerprint.fromRow(row);
-    expect(stored.segmentHash, fp.segmentHash);
-    expect(stored.frozen, isFalse);
-    expect(stored.receivedAt.difference(DateTime.now()).abs(),
-        lessThan(const Duration(minutes: 1)));
-  });
+      final row = await driver1
+          .from('fingerprints')
+          .select()
+          .eq('device_id', deviceId)
+          .eq('seq', 1)
+          .single();
+      final stored = StoredFingerprint.fromRow(row);
+      expect(stored.segmentHash, fp.segmentHash);
+      expect(stored.frozen, isFalse);
+      expect(
+        stored.receivedAt.difference(DateTime.now()).abs(),
+        lessThan(const Duration(minutes: 1)),
+      );
+    },
+  );
 
-  test('renvoyer la même empreinte donne « doublon » (idempotence réelle)', () async {
-    final deviceId = const Uuid().v4();
-    await registerDevice(driver1, deviceId);
-    final sender = SupabaseFingerprintSender(driver1);
-    final fp = firstOf(deviceId);
+  test(
+    'renvoyer la même empreinte donne « doublon » (idempotence réelle)',
+    () async {
+      final deviceId = const Uuid().v4();
+      await registerDevice(driver1, deviceId);
+      final sender = SupabaseFingerprintSender(driver1);
+      final fp = firstOf(deviceId);
 
-    await sender.send(fp);
-    final again = await sender.send(fp);
+      await sender.send(fp);
+      final again = await sender.send(fp);
 
-    expect(again.status, SendStatus.duplicate);
-  });
+      expect(again.status, SendStatus.duplicate);
+    },
+  );
 
-  test('une empreinte pour le téléphone d\'un autre conducteur est refusée', () async {
-    final otherDevice = const Uuid().v4();
-    await registerDevice(driver2, otherDevice);
+  test(
+    'une empreinte pour le téléphone d\'un autre conducteur est refusée',
+    () async {
+      final otherDevice = const Uuid().v4();
+      await registerDevice(driver2, otherDevice);
 
-    final result = await SupabaseFingerprintSender(driver1).send(firstOf(otherDevice));
+      final result = await SupabaseFingerprintSender(
+        driver1,
+      ).send(firstOf(otherDevice));
 
-    expect(result.status, SendStatus.rejected);
-    expect(result.message, isNotNull);
-  });
+      expect(result.status, SendStatus.rejected);
+      expect(result.message, isNotNull);
+    },
+  );
 
   test('un serveur injoignable donne une erreur réseau', () async {
-    final unreachable = SupabaseClient('http://127.0.0.1:59999', publishableKey);
+    final unreachable = SupabaseClient(
+      'http://127.0.0.1:59999',
+      publishableKey,
+    );
 
-    final result =
-        await SupabaseFingerprintSender(unreachable).send(firstOf(const Uuid().v4()));
+    final result = await SupabaseFingerprintSender(
+      unreachable,
+    ).send(firstOf(const Uuid().v4()));
 
     expect(result.status, SendStatus.networkError);
     await unreachable.dispose();
@@ -118,10 +136,12 @@ void main() {
     final deviceId = const Uuid().v4();
     await registerDevice(driver1, deviceId);
 
-    final store = await LocalStore.open(await databaseFactoryFfi.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(singleInstance: false),
-    ));
+    final store = await LocalStore.open(
+      await databaseFactoryFfi.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(singleInstance: false),
+      ),
+    );
     var fp = firstOf(deviceId);
     await store.recordSegment(fp);
     for (var i = 0; i < 2; i++) {
@@ -133,11 +153,16 @@ void main() {
       await store.recordSegment(fp);
     }
 
-    final report =
-        await Uploader(store: store, sender: SupabaseFingerprintSender(driver1)).flush();
+    final report = await Uploader(
+      store: store,
+      sender: SupabaseFingerprintSender(driver1),
+    ).flush();
 
     expect(report.remaining, 0);
-    final rows = await driver1.from('fingerprints').select('seq').eq('device_id', deviceId);
+    final rows = await driver1
+        .from('fingerprints')
+        .select('seq')
+        .eq('device_id', deviceId);
     expect(rows, hasLength(3));
   });
 }

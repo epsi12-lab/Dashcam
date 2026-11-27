@@ -8,10 +8,14 @@ import 'package:web/web.dart' as web;
 import 'verdict_style.dart';
 
 /// Lit une vidéo choisie par l'agent, sans l'envoyer sur le réseau :
-/// le contenu est placé dans un Blob du navigateur, lu par une adresse
-/// temporaire blob:, libérée à la fermeture.
+/// le contenu est placé dans un `Blob` du navigateur, lu par une adresse
+/// temporaire `blob:` libérée à la fermeture.
 class VideoDialog extends StatefulWidget {
-  const VideoDialog({super.key, required this.fileName, required this.loadBytes});
+  const VideoDialog({
+    super.key,
+    required this.fileName,
+    required this.loadBytes,
+  });
 
   final String fileName;
   final Future<List<int>> Function() loadBytes;
@@ -72,25 +76,31 @@ class _VideoDialogState extends State<VideoDialog> {
         child: _error != null
             ? Text(_error!)
             : controller == null
-                ? const SizedBox(
-                    height: 200, child: Center(child: CircularProgressIndicator()))
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AspectRatio(
-                        aspectRatio: controller.value.aspectRatio,
-                        child: VideoPlayer(controller),
-                      ),
-                      VideoProgressIndicator(controller, allowScrubbing: true),
-                      ValueListenableBuilder<VideoPlayerValue>(
-                        valueListenable: controller,
-                        builder: (context, value, _) => IconButton(
-                          icon: Icon(value.isPlaying ? Icons.pause : Icons.play_arrow),
-                          onPressed: value.isPlaying ? controller.pause : controller.play,
-                        ),
-                      ),
-                    ],
+            ? const SizedBox(
+                height: 200,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AspectRatio(
+                    aspectRatio: controller.value.aspectRatio,
+                    child: VideoPlayer(controller),
                   ),
+                  VideoProgressIndicator(controller, allowScrubbing: true),
+                  ValueListenableBuilder<VideoPlayerValue>(
+                    valueListenable: controller,
+                    builder: (context, value, _) => IconButton(
+                      icon: Icon(
+                        value.isPlaying ? Icons.pause : Icons.play_arrow,
+                      ),
+                      onPressed: value.isPlaying
+                          ? controller.pause
+                          : controller.play,
+                    ),
+                  ),
+                ],
+              ),
       ),
       actions: [
         TextButton(
