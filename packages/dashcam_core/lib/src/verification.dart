@@ -22,6 +22,8 @@ class SegmentResult {
     required this.verdict,
     required this.reason,
     this.alerts = const {},
+    this.startedAt,
+    this.endedAt,
   });
 
   final String fileName;
@@ -30,6 +32,11 @@ class SegmentResult {
 
   /// Explication lisible du verdict, destinée à l'assureur.
   final String reason;
+
+  /// Période filmée, d'après l'empreinte enregistrée.
+  /// Vide quand aucune empreinte n'a été trouvée pour ce fichier.
+  final DateTime? startedAt;
+  final DateTime? endedAt;
 }
 
 /// Vérifie les fichiers fournis par rapport aux empreintes enregistrées.
@@ -64,19 +71,42 @@ List<SegmentResult> verifySegments({
     }
   }
 
-  // 4. Vérification de chaque fichier, dans l'ordre d'origine.
+  // 4. Vérification de chaque fichier, dans l'ordre d'origine,
+  //    complétée par la période filmée quand l'empreinte est connue.
   return [
     for (var i = 0; i < provided.length; i++)
-      _verifyOne(
-        segment: provided[i],
-        name: names[i],
-        storedIndex: storedIndex,
-        providedHashes: providedHashes,
-        medianDelay: medianDelay,
-        segmentDuration: segmentDuration,
-        tolerance: tolerance,
+      _withPeriod(
+        _verifyOne(
+          segment: provided[i],
+          name: names[i],
+          storedIndex: storedIndex,
+          providedHashes: providedHashes,
+          medianDelay: medianDelay,
+          segmentDuration: segmentDuration,
+          tolerance: tolerance,
+        ),
+        names[i],
+        storedIndex,
       ),
   ];
+}
+
+/// Recopie dans le résultat les heures de l'empreinte enregistrée, si elle existe.
+SegmentResult _withPeriod(
+  SegmentResult result,
+  SegmentName? name,
+  Map<String, Map<int, StoredFingerprint>> storedIndex,
+) {
+  final s = name == null ? null : storedIndex[name.deviceId]?[name.seq];
+  if (s == null) return result;
+  return SegmentResult(
+    fileName: result.fileName,
+    verdict: result.verdict,
+    reason: result.reason,
+    alerts: result.alerts,
+    startedAt: s.startedAt,
+    endedAt: s.endedAt,
+  );
 }
 
 SegmentResult _verifyOne({

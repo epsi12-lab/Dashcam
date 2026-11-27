@@ -187,4 +187,22 @@ void main() {
   test('aucun fichier fourni donne une liste vide', () {
     expect(verifySegments(provided: [], stored: []), isEmpty);
   });
+
+    group('Période filmée', () {
+    test('un segment connu reprend les heures de son empreinte enregistrée', () {
+      final s41 = stored(deviceA, 41);
+      final results = verifySegments(provided: [provided(deviceA, 41)], stored: [s41]);
+      expect(results.single.startedAt, s41.startedAt);
+      expect(results.single.endedAt, s41.endedAt);
+    });
+
+    test('un fichier sans empreinte n\'a pas de période', () {
+      final results = verifySegments(
+        provided: [ProvidedSegment(fileName: 'VID_2041.mp4', computedHash: h(1))],
+        stored: [stored(deviceA, 41)],
+      );
+      expect(results.single.startedAt, isNull);
+      expect(results.single.endedAt, isNull);
+    });
+  });
 }
