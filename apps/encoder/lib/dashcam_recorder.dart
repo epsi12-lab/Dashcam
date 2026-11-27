@@ -22,6 +22,7 @@ class RecorderState {
     this.error,
     this.lastGap,
     this.lastHashTime,
+    this.startedAt,
   });
 
   final bool recording;
@@ -36,6 +37,9 @@ class RecorderState {
   /// Durée du calcul de l'empreinte du dernier segment.
   final Duration? lastHashTime;
 
+  /// Début de l'enregistrement en cours, pour le compteur affiché.
+  final DateTime? startedAt;
+
   RecorderState copyWith({
     bool? recording,
     int? lastSeq,
@@ -45,6 +49,8 @@ class RecorderState {
     bool clearError = false,
     Duration? lastGap,
     Duration? lastHashTime,
+    DateTime? startedAt,
+    bool clearStartedAt = false,
   }) =>
       RecorderState(
         recording: recording ?? this.recording,
@@ -54,6 +60,7 @@ class RecorderState {
         error: clearError ? null : (error ?? this.error),
         lastGap: lastGap ?? this.lastGap,
         lastHashTime: lastHashTime ?? this.lastHashTime,
+        startedAt: clearStartedAt ? null : (startedAt ?? this.startedAt),
       );
 }
 
@@ -96,7 +103,7 @@ class DashcamRecorder {
     try {
       await _startSegment();
       // « Enregistrement » seulement une fois le démarrage confirmé.
-      state.value = state.value.copyWith(recording: true);
+      state.value = state.value.copyWith(recording: true, startedAt: DateTime.now());
     } on CameraException catch (e) {
       _fail('Démarrage impossible : ${e.description}');
     } on TimeoutException {
@@ -117,7 +124,7 @@ class DashcamRecorder {
       state.value = state.value.copyWith(error: 'Arrêt incomplet : la caméra ne répond pas.');
     }
     await _pending;
-    state.value = state.value.copyWith(recording: false);
+    state.value = state.value.copyWith(recording: false, clearStartedAt: true);
   }
 
   void dispose() {
@@ -185,7 +192,7 @@ class DashcamRecorder {
   void _fail(String message) {
     _running = false;
     _timer?.cancel();
-    state.value = state.value.copyWith(recording: false, error: message);
+    state.value = state.value.copyWith(recording: false, error: message, clearStartedAt: true);
   }
 
   static Future<void> _move(String from, String to) async {
