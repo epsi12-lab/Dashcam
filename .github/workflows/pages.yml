@@ -28,7 +28,7 @@ jobs:
           channel: stable
           flutter-version: 3.38.9
           cache: true
-          
+
       - name: Construire le décodeur
         working-directory: apps/decoder
         env:
@@ -38,8 +38,7 @@ jobs:
           flutter pub get
           flutter build web --release --base-href /Dashcam/ \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_KEY="$SUPABASE_KEY" \
-            --dart-define=PROFILE=demo
+            --dart-define=SUPABASE_KEY="$SUPABASE_KEY"
 
       - uses: actions/upload-pages-artifact@v5.0.0
         with:
