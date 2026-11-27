@@ -17,4 +17,5 @@ abstract final class Palette {
   static const neutralBg = Color(0xFFEEF2F1);
   static const errorBg = Color(0xFFFDECEA);
   static const errorFg = Color(0xFFA3271C);
+  static const background = Color(0xFFF4F7F6);
 }
